@@ -14,7 +14,6 @@ A simple web interface for controlling a lock via Home Assistant.
   - Features: Normally Open (NO) and Normally Closed (NC) contacts
   - Manual override switch
 - 12V Magnetic Lock
-- Door Contact Sensor (optional, for status feedback)
 
 ### Wiring Diagram
 ```
@@ -30,11 +29,7 @@ A simple web interface for controlling a lock via Home Assistant.
     │
     └─── Magnetic Lock Controller (DC Output)
          │
-         ├─── 12V DC to Magnetic Lock
-         │
-         └─── Door Contact Sensor (optional)
-              │
-              └─── Shelly Plus 1 (Input)
+         └─── 12V DC to Magnetic Lock
 ```
 
 ### Controller Setup
@@ -46,7 +41,6 @@ A simple web interface for controlling a lock via Home Assistant.
      - Use the Normally Open (NO) contacts
 3. Connect the 12V DC output to the magnetic lock
 4. Connect the manual override switch (if available)
-5. Connect the door contact sensor to the Shelly Plus 1 input (optional)
 
 ### Home Assistant Configuration
 1. Add the Shelly Plus 1 to Home Assistant:
@@ -74,17 +68,6 @@ A simple web interface for controlling a lock via Home Assistant.
            entity_id: switch.shelly_plus_1_relay_0
    ```
 
-3. Optional: Add door contact sensor for status feedback:
-   ```yaml
-   # Example binary_sensor.yaml
-   binary_sensor:
-     - platform: template
-       sensors:
-         door_contact:
-           friendly_name: "Door Contact"
-           value_template: "{{ states('sensor.shelly_plus_1_input') == 'on' }}"
-   ```
-
 ### Safety Considerations
 1. Always use a properly rated magnetic lock controller
 2. Ensure proper grounding of all components
@@ -103,12 +86,7 @@ A simple web interface for controlling a lock via Home Assistant.
    - Verify Shelly Plus 1 is connected to WiFi
    - Check Home Assistant entity states
 
-2. If status feedback is incorrect:
-   - Check door contact sensor alignment
-   - Verify sensor wiring
-   - Check Home Assistant entity configuration
-
-3. If manual override doesn't work:
+2. If manual override doesn't work:
    - Check switch connections
    - Verify controller's manual override functionality
    - Test with power disconnected
