@@ -65,18 +65,18 @@ if [ $# -eq 1 ]; then
     echo -e "${GREEN}Reading configuration from: $1${NC}"
     read_config_file "$1"
 else
-    # Get Home Assistant URL
-    read -p "Enter your Home Assistant URL (e.g., https://ha.silverserver.nl): " HA_URL
-    if [ -z "$HA_URL" ]; then
-        echo -e "${RED}Error: Home Assistant URL is required.${NC}"
-        exit 1
-    fi
+# Get Home Assistant URL
+read -p "Enter your Home Assistant URL (e.g., https://ha.silverserver.nl): " HA_URL
+if [ -z "$HA_URL" ]; then
+    echo -e "${RED}Error: Home Assistant URL is required.${NC}"
+    exit 1
+fi
 
-    # Get Home Assistant token
-    read -p "Enter your Home Assistant long-lived access token: " HA_TOKEN
-    if [ -z "$HA_TOKEN" ]; then
-        echo -e "${RED}Error: Home Assistant token is required.${NC}"
-        exit 1
+# Get Home Assistant token
+read -p "Enter your Home Assistant long-lived access token: " HA_TOKEN
+if [ -z "$HA_TOKEN" ]; then
+    echo -e "${RED}Error: Home Assistant token is required.${NC}"
+    exit 1
     fi
 fi
 
