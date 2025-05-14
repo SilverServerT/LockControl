@@ -8,27 +8,45 @@ A simple web interface for controlling a lock via Home Assistant.
 
 ### Required Components
 - Shelly Plus 1 (or similar Shelly relay)
-- 12V Magnetic Lock Controller
-- 12V Power Supply
-- Magnetic Lock (12V)
+- 220V AC to 12V DC Magnetic Lock Controller
+  - Input: 220V AC
+  - Output: 12V DC
+  - Features: Normally Open (NO) and Normally Closed (NC) contacts
+  - Manual override switch
+- 12V Magnetic Lock
 - Door Contact Sensor (optional, for status feedback)
 
 ### Wiring Diagram
 ```
-12V Power Supply
+220V AC Power
     │
-    ├─── Shelly Plus 1 (Power)
+    ├─── Magnetic Lock Controller (AC Input)
     │    │
-    │    └─── Shelly Plus 1 (Switch)
-    │         │
-    │         └─── Magnetic Lock Controller
-    │              │
-    │              └─── Magnetic Lock
+    │    ├─── Shelly Plus 1 (Power)
+    │    │    │
+    │    │    └─── Shelly Plus 1 (Switch) ─── Controller (NO/NC Contacts)
+    │    │
+    │    └─── Manual Override Switch
     │
-    └─── Door Contact Sensor (optional)
+    └─── Magnetic Lock Controller (DC Output)
          │
-         └─── Shelly Plus 1 (Input)
+         ├─── 12V DC to Magnetic Lock
+         │
+         └─── Door Contact Sensor (optional)
+              │
+              └─── Shelly Plus 1 (Input)
 ```
+
+### Controller Setup
+1. Connect 220V AC power to the controller's AC input terminals
+2. Connect the Shelly Plus 1 to the controller's NO/NC contacts:
+   - For fail-safe operation (lock opens on power loss):
+     - Use the Normally Closed (NC) contacts
+   - For fail-secure operation (lock stays locked on power loss):
+     - Use the Normally Open (NO) contacts
+3. Connect the 12V DC output to the magnetic lock
+4. Connect the manual override switch (if available)
+5. Connect the door contact sensor to the Shelly Plus 1 input (optional)
 
 ### Home Assistant Configuration
 1. Add the Shelly Plus 1 to Home Assistant:
@@ -68,23 +86,32 @@ A simple web interface for controlling a lock via Home Assistant.
    ```
 
 ### Safety Considerations
-1. Always use a properly rated power supply for your magnetic lock
-2. Consider adding a backup power supply for the lock
-3. Ensure proper grounding of all components
-4. Use appropriate wire gauges for the current requirements
-5. Consider adding a manual override switch for emergency situations
+1. Always use a properly rated magnetic lock controller
+2. Ensure proper grounding of all components
+3. Use appropriate wire gauges for both AC and DC circuits
+4. Consider adding a backup power supply for the lock
+5. Test the manual override switch regularly
+6. Label all wires and connections clearly
+7. Consider adding a power indicator LED
+8. Install a circuit breaker for the AC input
 
 ### Troubleshooting
 1. If the lock doesn't respond:
-   - Check power supply voltage
+   - Check AC power to the controller
+   - Verify DC output voltage (should be 12V)
+   - Check Shelly Plus 1 connection to NO/NC contacts
    - Verify Shelly Plus 1 is connected to WiFi
    - Check Home Assistant entity states
-   - Verify wiring connections
 
 2. If status feedback is incorrect:
    - Check door contact sensor alignment
    - Verify sensor wiring
    - Check Home Assistant entity configuration
+
+3. If manual override doesn't work:
+   - Check switch connections
+   - Verify controller's manual override functionality
+   - Test with power disconnected
 
 ## Interface Overview
 
