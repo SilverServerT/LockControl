@@ -2,6 +2,37 @@
 
 A simple web interface for controlling a lock via Home Assistant.
 
+![Lock Control Interface](lockcontrol.png)
+
+## Interface Overview
+
+The interface provides a clean, modern UI for controlling your lock with the following features:
+
+### Main Controls
+- **Lock/Unlock Button**: Large toggle button that changes color and icon based on lock state
+  - Green when locked
+  - Red when unlocked
+  - Shows loading state during operations
+
+### Quick Access Timers
+- **10 Second Unlock**: Temporarily unlocks the door for 10 seconds
+- **30 Minute Unlock**: Keeps the door unlocked for 30 minutes
+- **Until Sunset**: Unlocks the door until the next sunset (only available during daytime)
+
+### Status Information
+- **Lock Status**: Shows current lock state with visual indicator
+- **Timer Display**: Shows countdown when a timer is active
+- **Info Bar**: Displays:
+  - Current time
+  - Current date
+  - Weather conditions
+  - Sunset time
+
+### Additional Features
+- **P2000 Notifications**: Shows recent emergency service notifications
+- **Garbage Collection**: Displays next day's garbage collection schedule
+- **Debug Mode**: Accessible via URL parameter `?debug` for testing time-based features
+
 ## Features
 
 - Clean, modern UI with a lock/unlock button
