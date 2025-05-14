@@ -13,22 +13,48 @@ echo "This script will help you set up your configuration file."
 DEFAULT_DOCKER_PATH="/config/www/lockcontrol"
 CURRENT_DIR=$(pwd)
 
-echo -e "${YELLOW}Docker Path Information:${NC}"
-echo "Default Docker path: ${DEFAULT_DOCKER_PATH}"
+echo -e "${YELLOW}Home Assistant Installation Type:${NC}"
+echo "Please select your Home Assistant installation type:"
+echo "1) Home Assistant OS"
+echo "2) Home Assistant Container"
+echo "3) Home Assistant Supervised"
+echo "4) Home Assistant Core"
+echo "5) Local Development"
+read -p "Enter your choice (1-5): " HA_TYPE
+
+case $HA_TYPE in
+    1|2|3)
+        HA_PATH="/config/www/lockcontrol"
+        ;;
+    4)
+        HA_PATH="/homeassistant/www/lockcontrol"
+        ;;
+    5)
+        read -p "Enter your local web server path: " HA_PATH
+        ;;
+    *)
+        echo -e "${RED}Invalid choice${NC}"
+        exit 1
+        ;;
+esac
+
+echo -e "${YELLOW}Path Information:${NC}"
+echo "Selected path: ${HA_PATH}"
 echo "Current directory: ${CURRENT_DIR}"
 echo
 echo "If you're running this in a Docker container, make sure this directory"
 echo "is properly mounted to your Home Assistant configuration."
 echo
-read -p "Is this the correct directory for your Docker container? (y/N) " -n 1 -r
+read -p "Is this the correct directory? (y/N) " -n 1 -r
 echo
 if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    read -p "Enter the correct Docker path: " CUSTOM_DOCKER_PATH
-    if [ -z "$CUSTOM_DOCKER_PATH" ]; then
-        echo -e "${RED}Error: Docker path is required.${NC}"
+    read -p "Enter the correct path: " CUSTOM_PATH
+    if [ -z "$CUSTOM_PATH" ]; then
+        echo -e "${RED}Error: Path is required.${NC}"
         exit 1
     fi
-    echo -e "${YELLOW}Using custom Docker path: ${CUSTOM_DOCKER_PATH}${NC}"
+    echo -e "${YELLOW}Using custom path: ${CUSTOM_PATH}${NC}"
+    HA_PATH=$CUSTOM_PATH
 fi
 
 # Check if config.local.js already exists
@@ -62,7 +88,7 @@ cat > config.local.js << EOL
 const config = {
     HA_TOKEN: '${HA_TOKEN}',
     HA_URL: '${HA_URL}',
-    DOCKER_PATH: '${CUSTOM_DOCKER_PATH:-$DEFAULT_DOCKER_PATH}'
+    DOCKER_PATH: '${HA_PATH}'
 };
 
 // Prevent modification of the config object
@@ -77,7 +103,7 @@ echo -e "${YELLOW}Important:${NC}"
 echo "1. Make sure config.local.js is in your .gitignore"
 echo "2. Never commit this file to version control"
 echo "3. Keep your token secure"
-echo "4. Docker path is set to: ${CUSTOM_DOCKER_PATH:-$DEFAULT_DOCKER_PATH}"
+echo "4. Path is set to: ${HA_PATH}"
 
 # Verify .gitignore
 if grep -q "config.local.js" .gitignore; then
@@ -93,19 +119,9 @@ else
 fi
 
 echo
-echo -e "${YELLOW}Docker Setup Instructions:${NC}"
-echo "1. Make sure your Docker container has the correct volume mount:"
-echo "   -v /path/to/your/config/www/lockcontrol:/config/www/lockcontrol"
-echo "2. The files should be accessible through your Home Assistant instance at:"
-echo "   http://your-ha-ip:8123/local/lockcontrol/"
-echo "3. If you need to change the path, update the DOCKER_PATH in config.local.js"
-
-echo
 echo -e "${YELLOW}Home Assistant Integration Instructions:${NC}"
 echo "1. Copy all files to your Home Assistant www directory:"
-echo "   - For Docker: Copy to /config/www/lockcontrol/"
-echo "   - For Home Assistant OS: Copy to /config/www/lockcontrol/"
-echo "   - For Home Assistant Supervised: Copy to /config/www/lockcontrol/"
+echo "   Selected path: ${HA_PATH}"
 echo
 echo "2. Required files to copy:"
 echo "   - lockcontrol.html"
@@ -115,7 +131,13 @@ echo "   - All .js files"
 echo "   - All .css files"
 echo
 echo "3. After copying, restart Home Assistant or reload the www folder"
-echo "4. Access the interface at: http://your-ha-ip:8123/local/lockcontrol/lockcontrol.html"
+echo "4. Access the interface:"
+if [ "$HA_TYPE" = "5" ]; then
+    echo "   - Via your local web server URL"
+else
+    echo "   - If using Home Assistant's built-in web server: http://your-ha-ip:8123/local/lockcontrol/lockcontrol.html"
+    echo "   - If using a reverse proxy: https://your-domain/local/lockcontrol/lockcontrol.html"
+fi
 echo
-echo -e "${YELLOW}Note:${NC} If you're using Docker, make sure the volume mount includes the www directory"
-echo "      and that the permissions are set correctly (usually www-data:www-data)" 
+echo -e "${YELLOW}Note:${NC} Make sure the directory has the correct permissions"
+echo "      (usually www-data:www-data for Home Assistant installations)" 

@@ -65,10 +65,12 @@ The interface provides a clean, modern UI for controlling your lock with the fol
 ## Home Assistant Integration
 
 ### File Location
-Copy all files to your Home Assistant www directory:
-- For Docker: `/config/www/lockcontrol/`
-- For Home Assistant OS: `/config/www/lockcontrol/`
-- For Home Assistant Supervised: `/config/www/lockcontrol/`
+Copy all files to your Home Assistant www directory. The location depends on your Home Assistant installation type:
+
+- **Home Assistant OS**: `/config/www/lockcontrol/`
+- **Home Assistant Container**: `/config/www/lockcontrol/`
+- **Home Assistant Supervised**: `/config/www/lockcontrol/`
+- **Home Assistant Core**: `/homeassistant/www/lockcontrol/`
 
 ### Required Files
 Make sure to copy:
@@ -88,7 +90,16 @@ volumes:
 ### Accessing the Interface
 After copying the files:
 1. Restart Home Assistant or reload the www folder
-2. Access the interface at: `http://your-ha-ip:8123/local/lockcontrol/lockcontrol.html`
+2. Access the interface through your Home Assistant instance:
+   - If using Home Assistant's built-in web server: `http://your-ha-ip:8123/local/lockcontrol/lockcontrol.html`
+   - If using a reverse proxy: `https://your-domain/local/lockcontrol/lockcontrol.html`
+   - If using a custom web server: Configure according to your setup
+
+### Local Development
+For local development and testing:
+1. Copy the files to your local web server directory
+2. Access via your local web server URL
+3. Make sure your Home Assistant instance is accessible from your development machine
 
 ## Security Notes
 
