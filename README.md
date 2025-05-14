@@ -4,6 +4,88 @@ A simple web interface for controlling a lock via Home Assistant.
 
 ![Lock Control Interface](lockcontrol.png)
 
+## Hardware Setup
+
+### Required Components
+- Shelly Plus 1 (or similar Shelly relay)
+- 12V Magnetic Lock Controller
+- 12V Power Supply
+- Magnetic Lock (12V)
+- Door Contact Sensor (optional, for status feedback)
+
+### Wiring Diagram
+```
+12V Power Supply
+    │
+    ├─── Shelly Plus 1 (Power)
+    │    │
+    │    └─── Shelly Plus 1 (Switch)
+    │         │
+    │         └─── Magnetic Lock Controller
+    │              │
+    │              └─── Magnetic Lock
+    │
+    └─── Door Contact Sensor (optional)
+         │
+         └─── Shelly Plus 1 (Input)
+```
+
+### Home Assistant Configuration
+1. Add the Shelly Plus 1 to Home Assistant:
+   ```yaml
+   # Example configuration.yaml entry
+   shelly:
+     discovery: true
+   ```
+
+2. Create a lock entity in Home Assistant:
+   ```yaml
+   # Example lock.yaml
+   lock:
+     - platform: template
+       name: "Front Door Lock"
+       unique_id: front_door_lock
+       value_template: "{{ states('input_boolean.door_lock_state') }}"
+       lock:
+         service: switch.turn_on
+         target:
+           entity_id: switch.shelly_plus_1_relay_0
+       unlock:
+         service: switch.turn_off
+         target:
+           entity_id: switch.shelly_plus_1_relay_0
+   ```
+
+3. Optional: Add door contact sensor for status feedback:
+   ```yaml
+   # Example binary_sensor.yaml
+   binary_sensor:
+     - platform: template
+       sensors:
+         door_contact:
+           friendly_name: "Door Contact"
+           value_template: "{{ states('sensor.shelly_plus_1_input') == 'on' }}"
+   ```
+
+### Safety Considerations
+1. Always use a properly rated power supply for your magnetic lock
+2. Consider adding a backup power supply for the lock
+3. Ensure proper grounding of all components
+4. Use appropriate wire gauges for the current requirements
+5. Consider adding a manual override switch for emergency situations
+
+### Troubleshooting
+1. If the lock doesn't respond:
+   - Check power supply voltage
+   - Verify Shelly Plus 1 is connected to WiFi
+   - Check Home Assistant entity states
+   - Verify wiring connections
+
+2. If status feedback is incorrect:
+   - Check door contact sensor alignment
+   - Verify sensor wiring
+   - Check Home Assistant entity configuration
+
 ## Interface Overview
 
 The interface provides a clean, modern UI for controlling your lock with the following features:
