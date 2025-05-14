@@ -15,32 +15,12 @@ A simple web interface for controlling a lock via Home Assistant.
   - Manual override switch
 - 12V Magnetic Lock
 
-### Wiring Diagram
-```
-220V AC Power
-    │
-    ├─── Magnetic Lock Controller (AC Input)
-    │    │
-    │    ├─── Shelly Plus 1 (Power)
-    │    │    │
-    │    │    └─── Shelly Plus 1 (Switch) ─── Controller (NO/NC Contacts)
-    │    │
-    │    └─── Manual Override Switch
-    │
-    └─── Magnetic Lock Controller (DC Output)
-         │
-         └─── 12V DC to Magnetic Lock
-```
-
-### Controller Setup
-1. Connect 220V AC power to the controller's AC input terminals
-2. Connect the Shelly Plus 1 to the controller's NO/NC contacts:
-   - For fail-safe operation (lock opens on power loss):
-     - Use the Normally Closed (NC) contacts
-   - For fail-secure operation (lock stays locked on power loss):
-     - Use the Normally Open (NO) contacts
-3. Connect the 12V DC output to the magnetic lock
-4. Connect the manual override switch (if available)
+### Important Setup Notes
+1. Research and understand how to properly connect a Shelly Plus 1 to your specific magnetic lock controller
+2. Consult your magnetic lock controller's documentation for proper wiring instructions
+3. Ensure you understand the difference between fail-safe and fail-secure operation
+4. Always follow local electrical codes and safety regulations
+5. Consider consulting with a qualified electrician for installation
 
 ### Home Assistant Configuration
 1. Add the Shelly Plus 1 to Home Assistant:
@@ -77,6 +57,8 @@ A simple web interface for controlling a lock via Home Assistant.
 6. Label all wires and connections clearly
 7. Consider adding a power indicator LED
 8. Install a circuit breaker for the AC input
+9. Never work on live electrical circuits
+10. Follow all manufacturer safety guidelines
 
 ### Troubleshooting
 1. If the lock doesn't respond:
