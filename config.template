@@ -1,0 +1,9 @@
+# Home Assistant Configuration Template
+# Copy this file to config.private and fill in your values
+# Then run: ./update_config.sh config.private
+
+# Your Home Assistant URL (e.g., https://ha.silverserver.nl)
+HA_URL=https://your-home-assistant-url
+
+# Your Home Assistant long-lived access token
+HA_TOKEN=your-long-lived-access-token 

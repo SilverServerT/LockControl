@@ -1,0 +1,1086 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Magnetic Lock Control</title>
+  <link rel="icon" href="/local/favicon.ico" type="image/x-icon">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@6.5.95/css/materialdesignicons.min.css">
+  <style>
+    :root {
+      --primary: #1976d2;
+      --primary-dark: #1565c0;
+      --accent: #388e3c;
+      --danger: #d32f2f;
+      --bg: #f0f2f5;
+      --card-bg: #fff;
+      --shadow: 0 4px 24px rgba(0,0,0,0.08);
+      --radius: 18px;
+      --transition: 0.2s cubic-bezier(.4,0,.2,1);
+    }
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      background: var(--bg);
+      font-family: 'Roboto', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .container {
+      max-width: 420px;
+      margin: 0 auto;
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px 20px 10px 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      box-sizing: border-box;
+      transition: border-color 0.3s;
+      border: 4px solid #bbb;
+    }
+    .container.locked {
+      border-color: #43a047;
+    }
+    .container.unlocked {
+      border-color: #e53935;
+    }
+    .container.unknown {
+      border-color: #bbb;
+    }
+    .lock-icon-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin: 10px 0;
+      padding: 20px;
+      background: rgba(0,0,0,0.03);
+      border-radius: 50%;
+      width: 120px;
+      height: 120px;
+      justify-content: center;
+    }
+    .lock-icon-container svg {
+      transition: fill 0.3s, stroke 0.3s;
+      width: 3.5rem;
+      height: 3.5rem;
+    }
+    .status-text {
+      text-align: center;
+      font-size: 1.2em;
+      font-weight: 500;
+      margin-top: 1em;
+      color: #444;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .loading {
+      text-align: center;
+      color: #888;
+      font-size: 0.9em;
+      margin: 10px 0;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .loading .material-icons {
+      font-size: 1.2em;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      100% { transform: rotate(360deg); }
+    }
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      margin: 10px 0;
+      padding: 15px 0;
+      font-size: 1.1em;
+      border: none;
+      border-radius: 10px;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      transition: all var(--transition);
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
+      -webkit-appearance: none;
+      appearance: none;
+      gap: 8px;
+    }
+    .btn .material-icons {
+      font-size: 1.2em;
+    }
+    .btn:active {
+      transform: scale(0.98);
+      box-shadow: 0 1px 4px rgba(25, 118, 210, 0.08);
+    }
+    .btn:disabled {
+      background: #b0b0b0;
+      cursor: not-allowed;
+      color: #eee;
+      box-shadow: none;
+    }
+    .toggle-btn {
+      background: var(--accent);
+      margin-bottom: 15px;
+    }
+    .toggle-btn.unlocked {
+      background: var(--danger);
+    }
+    .reason {
+      font-size: 0.9em;
+      color: #666;
+      text-align: center;
+      margin: 5px 0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .reason .material-icons {
+      font-size: 1.1em;
+    }
+    .timer {
+      text-align: center;
+      font-size: 1.1em;
+      margin: 15px 0 0 0;
+      color: var(--primary-dark);
+      font-weight: 500;
+      min-height: 1.5em;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    .timer .material-icons {
+      font-size: 1.2em;
+    }
+    .timer.unavailable {
+      color: #888;
+      font-style: italic;
+    }
+    .info-bar {
+      width: 100%;
+      background: rgba(0, 0, 0, 0.03);
+      border-radius: 12px;
+      padding: 12px 15px;
+      margin-top: 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.9em;
+      color: #444;
+    }
+    .info-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .info-item .material-icons {
+      font-size: 1.2em;
+    }
+    .notification-item {
+      display: flex;
+      align-items: center;
+      margin-top: 8px;
+      font-size: 0.9em;
+      color: #666;
+      gap: 4px;
+    }
+    .notification-item .material-icons {
+      font-size: 1.1em;
+    }
+    #brandweerTimestamp {
+      text-align: center;
+      font-size: 0.8em;
+      color: #888;
+      margin-top: 5px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+    }
+    #brandweerTimestamp .material-icons {
+      font-size: 1em;
+    }
+    @media (max-width: 600px) {
+      .container {
+        max-width: 100%;
+        margin: 0;
+        padding: 8px 15px 3px 15px;
+        min-height: calc(100vh - 40px);
+        height: calc(100vh - 40px);
+        overflow: hidden;
+        border-width: 6px;
+        display: flex;
+        flex-direction: column;
+      }
+      .lock-icon-container {
+        width: 80px;
+        height: 80px;
+        margin: 2px 0;
+        padding: 15px;
+      }
+      .lock-icon-container svg {
+        width: 2rem;
+        height: 2rem;
+      }
+      .status-text {
+        font-size: 1em;
+        margin-top: 0.3em;
+      }
+      .btn {
+        font-size: 0.95em;
+        padding: 8px 0;
+        margin: 4px 0;
+      }
+      .timer {
+        font-size: 0.9em;
+        margin: 8px 0 0 0;
+      }
+      .reason {
+        font-size: 0.8em;
+        margin: 2px 0;
+      }
+      .info-bar {
+        padding: 6px 8px;
+        font-size: 0.75em;
+        margin-top: 8px;
+      }
+      .notification-item {
+        margin-top: 3px;
+        font-size: 0.8em;
+      }
+      #brandweerTimestamp {
+        margin-top: 3px;
+        font-size: 0.75em;
+      }
+    }
+    .brandweer-entry {
+      display: flex;
+      align-items: flex-start;
+      margin: 4px 0;
+      padding: 6px;
+      background: rgba(0,0,0,0.03);
+      border-radius: 8px;
+      font-size: 0.8em;
+    }
+    .brandweer-entry .material-icons {
+      font-size: 1.1em;
+      margin-right: 6px;
+      color: #d32f2f;
+    }
+    .brandweer-content {
+      flex: 1;
+    }
+    .brandweer-time {
+      font-size: 0.75em;
+      color: #888;
+      margin-top: 2px;
+    }
+    @media (max-width: 600px) {
+      .brandweer-entry {
+        font-size: 0.75em;
+        padding: 4px;
+        margin: 2px 0;
+      }
+      .brandweer-time {
+        font-size: 0.7em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container unknown" id="mainContainer">
+    <div class="lock-icon-container">
+      <span id="lockIcon"></span>
+      <div id="lockStatusText" class="status-text">Loading status...</div>
+    </div>
+    <div class="loading" id="loadingIndicator">
+      <span class="material-icons">refresh</span>
+      Please wait, fetching lock status...
+    </div>
+    <button class="btn toggle-btn" id="toggleLockBtn" onclick="toggleLock()" disabled>
+      <span class="material-icons">lock</span>
+      Toggle Lock
+    </button>
+    <button class="btn" id="btn10s" onclick="unlockForSeconds(10)" disabled>
+      <span class="material-icons">lock_open</span>
+      Unlock for 10 seconds
+    </button>
+    <button class="btn" id="btn30min" onclick="unlockForSeconds(1800)" disabled>
+      <span class="material-icons">schedule</span>
+      Unlock for 30 minutes
+    </button>
+    <button class="btn" id="btnSunset" onclick="unlockUntilSunset()" disabled>
+      <span class="material-icons">nightlight_round</span>
+      Unlock until sunset
+    </button>
+    <div class="timer" id="timerDisplay"></div>
+    <button class="btn" id="clearTimerBtn" onclick="clearTimerState()" style="display: none; background: #ff9800; margin-top: 10px;">
+      <span class="material-icons">cleaning_services</span>
+      Clear Timer State (Debug)
+    </button>
+
+    <!-- Debug buttons for time simulation -->
+    <div id="debugButtons" style="display: none; margin-top: 10px; width: 100%;">
+      <button class="btn" onclick="simulateTimeChange(-2)" style="background: #2196F3;">
+        <span class="material-icons">schedule</span>
+        Simulate 2 hours ago
+      </button>
+      <button class="btn" onclick="simulateTimeChange(2)" style="background: #2196F3;">
+        <span class="material-icons">schedule</span>
+        Simulate 2 hours later
+      </button>
+      <button class="btn" onclick="simulateTimeChange(12)" style="background: #2196F3;">
+        <span class="material-icons">schedule</span>
+        Simulate 12 hours later
+      </button>
+    </div>
+
+    <div class="info-bar">
+      <div class="info-item">
+        <span class="material-icons">schedule</span>
+        <span id="currentTime">--:--</span>
+      </div>
+      <div class="info-item">
+        <span class="material-icons">calendar_today</span>
+        <span id="currentDate">--</span>
+      </div>
+      <div class="info-item">
+        <span class="material-icons">wb_sunny</span>
+        <span id="weatherInfo">--</span>
+      </div>
+      <div class="info-item">
+        <span class="material-icons">nightlight_round</span>
+        <span id="sunsetTime">--:--</span>
+      </div>
+    </div>
+    <div id="brandweerNotifications" style="width: 100%; margin-top: 8px;">
+      <!-- Notifications will be inserted here -->
+    </div>
+    <div id="brandweerTimestamp">
+      <span class="material-icons">update</span>
+      --
+    </div>
+    <div class="notification-item">
+      <span class="material-icons">notifications_active</span>
+      <span id="brandweerInfo">--</span>
+    </div>
+    <!-- Add garbage container info -->
+    <div id="garbageInfo" class="notification-item" style="display: none;">
+      <span class="material-icons">delete</span>
+      <span id="garbageContainerInfo">--</span>
+    </div>
+  </div>
+
+  <!-- Load configuration first -->
+  <script src="config.js"></script>
+  <script>
+    // Configuration object
+    const HA_URL = 'https://ha.silverserver.nl';
+    const HA_TOKEN = config.HA_TOKEN;
+    const ENTITY_ID = 'switch.tasmota';
+
+    // Initialize the application
+    function initializeApp() {
+      // Initialize the rest of your application
+      getLockState(false);
+      setInterval(() => {
+        getLockState(true);
+        if (currentState !== 'on') {
+          initializeTimer();
+        }
+      }, 60000);
+
+      updateSunsetTime();
+      setInterval(updateSunsetTime, 3600000);
+      initializeTimer();
+      updateInfoBar();
+      setInterval(updateInfoBar, 60000);
+    }
+
+    // Start the application
+    initializeApp();
+
+    let timerInterval = null;
+    let unlockEnd = null;
+    let currentState = null;
+    let controlsLocked = true;
+    let nounlocktimer = 1;
+    let lockPerformed = false;
+    let brandweerHistory = [];
+
+    // Show debug button if URL has debug parameter
+    if (window.location.search.includes('debug')) {
+      document.getElementById('clearTimerBtn').style.display = 'block';
+      document.getElementById('debugButtons').style.display = 'block';
+    }
+
+    function clearTimerState() {
+      console.log('Clearing timer state...');
+      
+      const data = {
+        entity_id: 'input_datetime.lock_unlock_end',
+        datetime: '2025-01-01 00:00:00'
+      };
+      
+      return fetch(`${HA_URL}/api/services/input_datetime/set_datetime`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to clear Home Assistant timer state: ' + response.status);
+        }
+        console.log('Home Assistant timer state cleared');
+        
+        // Clear any running timer
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        
+        // Update display
+        updateTimerDisplay(null);
+        
+        // Show success message
+        const timer = document.getElementById('timerDisplay');
+        timer.textContent = 'Timer state cleared';
+        timer.style.color = '#ff9800';
+        setTimeout(() => {
+          timer.textContent = 'No timer running';
+          timer.className = 'timer unavailable';
+        }, 2000);
+      })
+      .catch(error => {
+        console.error('Error clearing timer state:', error);
+        alert('Failed to clear timer state: ' + error.message);
+      });
+    }
+
+    function setControlsEnabled(enabled) {
+      document.getElementById('toggleLockBtn').disabled = !enabled;
+      document.getElementById('btn10s').disabled = !enabled;
+      document.getElementById('btn30min').disabled = !enabled;
+      document.getElementById('btnSunset').disabled = !enabled;
+    }
+
+    function showLoading(show) {
+      document.getElementById('loadingIndicator').style.display = show ? 'block' : 'none';
+    }
+
+    function callService(service, data) {
+      setControlsEnabled(false);
+      showLoading(true);
+      return fetch(`${HA_URL}/api/services/${service.split('.')[0]}/${service.split('.')[1]}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      }).then(() => {
+        // After service call, re-fetch state to re-enable controls
+        setTimeout(() => getLockState(false), 1000);
+      });
+    }
+
+    // backgroundPoll: true = background poll, false = user action/initial load
+    function getLockState(backgroundPoll = false) {
+      if (!backgroundPoll) {
+        setControlsEnabled(false);
+        showLoading(true);
+      }
+      fetch(`${HA_URL}/api/states/${ENTITY_ID}`, {
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          currentState = data.state;
+          updateLockStatus();
+          if (!backgroundPoll) {
+            setControlsEnabled(true);
+            showLoading(false);
+          }
+        })
+        .catch(() => {
+          document.getElementById('lockStatusText').textContent = 'Error fetching status';
+          document.getElementById('lockStatusText').className = 'status-text';
+          if (!backgroundPoll) {
+            setControlsEnabled(false);
+            showLoading(true);
+          }
+        });
+    }
+
+    function getStoredTimerState() {
+      console.log('Getting stored timer state');
+      console.log('Current device timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+      
+      return fetch(`${HA_URL}/api/states/input_datetime.lock_unlock_end`, {
+        method: 'GET',
+        headers: { 
+          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(res => {
+        if (!res.ok) {
+          throw new Error('Failed to get timer state: ' + res.status);
+        }
+        return res.json();
+      })
+      .then(data => {
+        console.log('Raw timer state from Home Assistant:', data);
+        if (data && data.state && data.state !== 'unknown') {
+          // Parse the datetime string from Home Assistant
+          const [datePart, timePart] = data.state.split(' ');
+          const [year, month, day] = datePart.split('-').map(Number);
+          const [hours, minutes, seconds] = timePart.split(':').map(Number);
+          
+          // Create a date object with the current year
+          const now = new Date();
+          const currentYear = now.getFullYear();
+          
+          // If the year is not current, clear the state
+          if (year !== currentYear) {
+            console.log(`Invalid year ${year}, expected ${currentYear}, clearing state`);
+            return clearTimerState().then(() => null);
+          }
+          
+          const startTime = new Date(
+            year,
+            month - 1, // JavaScript months are 0-based
+            day,
+            hours,
+            minutes,
+            seconds
+          );
+          
+          // Debug time values
+          console.log('Time values:');
+          console.log('Start time (raw):', data.state);
+          console.log('Start time (parsed):', startTime.toString());
+          console.log('Current time:', now.toString());
+          console.log('Time difference (ms):', now.getTime() - startTime.getTime());
+          
+          // Validate the start time
+          if (isNaN(startTime.getTime())) {
+            console.log('Invalid start time, clearing state');
+            return clearTimerState().then(() => null);
+          }
+          
+          // If start time is in the future, something is wrong
+          if (startTime > now) {
+            console.log('Start time is in the future, clearing invalid state');
+            return clearTimerState().then(() => null);
+          }
+          
+          // If start time is too old (more than 1 hour), clear it
+          if (now.getTime() - startTime.getTime() > 3600000) {
+            console.log('Start time is too old, clearing state');
+            return clearTimerState().then(() => null);
+          }
+          
+          const duration = 1800; // Fixed duration for 30 minutes
+          const endTime = new Date(startTime.getTime() + duration * 1000);
+          const timeLeft = endTime.getTime() - now.getTime();
+          
+          console.log('Timer state details:');
+          console.log('Start time (ISO):', startTime.toISOString());
+          console.log('Start time (local):', startTime.toString());
+          console.log('End time (ISO):', endTime.toISOString());
+          console.log('End time (local):', endTime.toString());
+          console.log('Current time (ISO):', now.toISOString());
+          console.log('Current time (local):', now.toString());
+          console.log('Time left:', timeLeft / 1000, 'seconds');
+          
+          if (timeLeft > 0) {
+            return { startTime, duration, endTime };
+          } else {
+            console.log('Timer has expired, clearing state');
+            return clearTimerState().then(() => null);
+          }
+        } else {
+          console.log('No valid state from Home Assistant');
+        }
+        return null;
+      })
+      .catch(error => {
+        console.error('Failed to get timer state:', error);
+        return null;
+      });
+    }
+
+    function storeTimerState(startTime, duration) {
+      console.log('Storing timer state - Start:', startTime, 'Duration:', duration);
+      console.log('Current device timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
+      
+      // Format the current time in the format Home Assistant expects
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      
+      const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+      
+      const data = {
+        entity_id: 'input_datetime.lock_unlock_end',
+        datetime: formattedDate
+      };
+      console.log('Sending data to Home Assistant:', data);
+      
+      return fetch(`${HA_URL}/api/services/input_datetime/set_datetime`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data)
+      }).then(response => {
+        if (!response.ok) {
+          throw new Error('Failed to store timer state: ' + response.status);
+        }
+        return response.json();
+      }).then(data => {
+        console.log('Timer state stored successfully in Home Assistant:', data);
+        // Verify the stored state
+        return getStoredTimerState();
+      }).catch(error => {
+        console.error('Failed to store timer state:', error);
+      });
+    }
+
+    function updateLockStatus() {
+      const statusText = document.getElementById('lockStatusText');
+      const iconSpan = document.getElementById('lockIcon');
+      const toggleBtn = document.getElementById('toggleLockBtn');
+      const mainContainer = document.getElementById('mainContainer');
+      if (currentState === 'on') {
+        // When lock is on, clear any active timer
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        clearTimerState();
+        updateTimerDisplay(null);
+        
+        statusText.textContent = 'Locked';
+        iconSpan.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#388e3c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:3.5em;height:3.5em;"><rect x="3" y="11" width="18" height="10" rx="2" fill="#43a047" stroke="#388e3c"/><path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="#388e3c" fill="none"/><circle cx="12" cy="16" r="2" fill="#fff"/></svg>`;
+        toggleBtn.textContent = 'Unlock';
+        toggleBtn.classList.remove('unlocked');
+        mainContainer.className = 'container locked';
+        nounlocktimer = 1; // No unlock timer when locked
+        lockPerformed = true; // Lock has been performed
+      } else if (currentState === 'off') {
+        statusText.textContent = 'Unlocked';
+        iconSpan.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#d32f2f" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:3.5em;height:3.5em;"><rect x="3" y="11" width="18" height="10" rx="2" fill="#e53935" stroke="#d32f2f"/><path d="M7 11V7a5 5 0 0 1 10 0" stroke="#d32f2f" fill="none"/><circle cx="12" cy="16" r="2" fill="#fff"/></svg>`;
+        toggleBtn.textContent = 'Lock';
+        toggleBtn.classList.add('unlocked');
+        mainContainer.className = 'container unlocked';
+        nounlocktimer = 0; // Unlock timer active when unlocked
+      } else {
+        statusText.textContent = 'Unknown';
+        iconSpan.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="width:3.5em;height:3.5em;"><rect x="3" y="11" width="18" height="10" rx="2" fill="#eee" stroke="#888"/><path d="M7 11V7a5 5 0 0 1 10 0" stroke="#888" fill="none"/><circle cx="12" cy="16" r="2" fill="#888"/></svg>`;
+        toggleBtn.textContent = 'Toggle Lock';
+        toggleBtn.classList.remove('unlocked');
+        mainContainer.className = 'container unknown';
+      }
+    }
+
+    function toggleLock() {
+      if (currentState === 'on') {
+        callService('switch.turn_off', { entity_id: ENTITY_ID });
+      } else if (currentState === 'off') {
+        // When manually locking, clear any active timer
+        if (timerInterval) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+        }
+        clearTimerState().then(() => {
+          callService('switch.turn_on', { entity_id: ENTITY_ID });
+        });
+      }
+    }
+
+    function updateTimerDisplay(timerState) {
+      const timer = document.getElementById('timerDisplay');
+      if (timerState) {
+        const now = new Date();
+        const timeLeft = timerState.endTime.getTime() - now.getTime();
+        
+        // If time has expired, clear the timer
+        if (timeLeft <= 0) {
+          console.log('Timer expired in display update');
+          clearTimerState();
+          return;
+        }
+        
+        const minutes = Math.floor(timeLeft / (1000 * 60));
+        const seconds = Math.floor((timeLeft % (1000 * 60)) / 1000);
+        
+        console.log('Updating timer display:');
+        console.log('Current time:', now.toISOString());
+        console.log('End time:', timerState.endTime.toISOString());
+        console.log('Time left:', timeLeft / 1000, 'seconds');
+        
+        timer.textContent = `Lock will re-engage in ${minutes}:${seconds.toString().padStart(2, '0')}`;
+        timer.className = 'timer';
+      } else {
+        timer.textContent = 'No timer running';
+        timer.className = 'timer unavailable';
+      }
+    }
+
+    function unlockForSeconds(seconds) {
+      console.log('Unlocking for', seconds, 'seconds');
+      const startTime = new Date();
+      const endTime = new Date(startTime.getTime() + seconds * 1000);
+      console.log('Start time:', startTime.toISOString());
+      console.log('End time:', endTime.toISOString());
+      
+      callService('switch.turn_off', { entity_id: ENTITY_ID });
+      storeTimerState(startTime, seconds);
+      updateTimerDisplay({ startTime, duration: seconds, endTime });
+      
+      // Update display every second for smooth countdown
+      if (timerInterval) {
+        clearInterval(timerInterval);
+      }
+      timerInterval = setInterval(() => {
+        const now = new Date();
+        const timeLeft = endTime.getTime() - now.getTime();
+        
+        if (timeLeft <= 0) {
+          console.log('Time to lock');
+          callService('switch.turn_on', { entity_id: ENTITY_ID });
+          clearInterval(timerInterval);
+          updateTimerDisplay(null);
+          clearTimerState();
+        } else {
+          updateTimerDisplay({ startTime, duration: seconds, endTime });
+        }
+      }, 1000); // Check every second for smooth countdown
+    }
+
+    function formatTime(date) {
+      return date.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', hour12: false });
+    }
+
+    // Function to simulate time changes for testing
+    function simulateTimeChange(hours) {
+      const now = new Date();
+      now.setHours(now.getHours() + hours);
+      console.log('Simulated time:', now);
+      
+      // Update the info bar with simulated time
+      document.getElementById('currentTime').textContent = now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', hour12: false });
+      document.getElementById('currentDate').textContent = `${now.getDate()}-${now.getMonth() + 1}`;
+      
+      // Re-run the sunset check with simulated time
+      checkSunsetStatus(now);
+      return now;
+    }
+
+    // Function to check sunset status with given time
+    function checkSunsetStatus(simulatedTime) {
+      fetch(`${HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          const sunset = new Date(data.attributes.next_setting);
+          const sunrise = new Date(data.attributes.next_rising);
+          const sunsetBtn = document.getElementById('btnSunset');
+          const now = simulatedTime || new Date();
+          
+          // If it's after sunset, button should be disabled
+          if (now >= sunset) {
+            sunsetBtn.style.backgroundColor = '#888';
+            sunsetBtn.style.cursor = 'not-allowed';
+            sunsetBtn.textContent = 'Sunset has passed';
+            sunsetBtn.disabled = true;
+          } 
+          // If it's after sunrise and before sunset, button should be enabled
+          else if (now >= sunrise) {
+            sunsetBtn.style.backgroundColor = '';
+            sunsetBtn.style.cursor = '';
+            sunsetBtn.textContent = `Unlock until ${formatTime(sunset)}`;
+            sunsetBtn.disabled = false;
+          } 
+          // If it's before sunrise, button should be disabled
+          else {
+            sunsetBtn.style.backgroundColor = '#888';
+            sunsetBtn.style.cursor = 'not-allowed';
+            sunsetBtn.textContent = `Waiting for sunrise (${formatTime(sunrise)})`;
+            sunsetBtn.disabled = true;
+          }
+        });
+    }
+
+    // Update unlockUntilSunset to use the new checkSunsetStatus function
+    function unlockUntilSunset() {
+      if (!lockPerformed) {
+        alert('Please lock the door first before using this option.');
+        return;
+      }
+      setControlsEnabled(false);
+      showLoading(true);
+      
+      fetch(`${HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          const now = new Date();
+          checkSunsetStatus(now);
+          setControlsEnabled(true);
+          showLoading(false);
+        })
+        .catch(error => {
+          console.error('Error fetching sunset time:', error);
+          alert('Error fetching sunset time!');
+          setControlsEnabled(true);
+          showLoading(false);
+        });
+    }
+
+    // Add a function to update sunset time display periodically
+    function updateSunsetTime() {
+      fetch(`${HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          const sunset = new Date(data.attributes.next_setting);
+          const sunsetBtn = document.getElementById('btnSunset');
+          sunsetBtn.textContent = `Unlock until ${formatTime(sunset)}`;
+        })
+        .catch(error => {
+          console.error('Error updating sunset time:', error);
+        });
+    }
+
+    // Check for existing timer when page loads
+    async function initializeTimer() {
+      try {
+        console.log('Initializing timer...');
+        const timerState = await getStoredTimerState();
+        console.log('Initial timer check - state:', timerState);
+
+        if (timerState) {
+          // Clear any existing interval
+          if (timerInterval) clearInterval(timerInterval);
+
+          // Start a new interval for smooth countdown
+          timerInterval = setInterval(() => {
+            const now = new Date();
+            const timeLeft = timerState.endTime.getTime() - now.getTime();
+            if (timeLeft <= 0) {
+              callService('switch.turn_on', { entity_id: ENTITY_ID });
+              clearInterval(timerInterval);
+              updateTimerDisplay(null);
+              clearTimerState();
+            } else {
+              updateTimerDisplay(timerState);
+            }
+          }, 1000);
+
+          updateTimerDisplay(timerState);
+        } else {
+          if (timerInterval) clearInterval(timerInterval);
+          updateTimerDisplay(null);
+        }
+      } catch (error) {
+        console.error('Error initializing timer:', error);
+        getLockState(false);
+      }
+    }
+
+    // Add these new functions for the info bar
+    function updateInfoBar() {
+      // Time and date
+      const now = new Date();
+      document.getElementById('currentTime').textContent = now.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', hour12: false });
+      document.getElementById('currentDate').textContent = `${now.getDate()}-${now.getMonth() + 1}`;
+
+      // Weather
+      fetch(`${HA_URL}/api/states/weather.forecast_home`, { 
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` } 
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.state && data.attributes) {
+            document.getElementById('weatherInfo').textContent = `${data.state}, ${data.attributes.temperature}°C`;
+          }
+        });
+
+      // Sunset
+      fetch(`${HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.attributes && data.attributes.next_setting) {
+            const sunset = new Date(data.attributes.next_setting);
+            document.getElementById('sunsetTime').textContent = sunset.toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit', hour12: false });
+          }
+        });
+
+      // Brandweer notification
+      fetch(`${HA_URL}/api/states/sensor.friesland`, { 
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` } 
+      })
+        .then(res => res.json())
+        .then(data => {
+          updateBrandweerNotifications(data);
+        });
+
+      // Garbage container info
+      fetch(`${HA_URL}/api/states/sensor.omrin_tomorrow`, { 
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` } 
+      })
+        .then(res => res.json())
+        .then(data => {
+          const garbageInfo = document.getElementById('garbageInfo');
+          const garbageContainerInfo = document.getElementById('garbageContainerInfo');
+          
+          if (data && data.state && data.state !== 'unknown' && data.state !== 'none') {
+            garbageInfo.style.display = 'flex';
+            garbageContainerInfo.textContent = `Tomorrow: ${data.state}`;
+          } else {
+            garbageInfo.style.display = 'none';
+          }
+        });
+    }
+
+    function updateBrandweerNotifications(data) {
+      const now = new Date();
+      const startTime = new Date(now.getTime() - 24 * 60 * 60 * 1000); // Last 24 hours
+      const endTime = now;
+      
+      // Format dates for API
+      const startTimeStr = startTime.toISOString();
+      const endTimeStr = endTime.toISOString();
+      
+      // Fetch history for the last 24 hours
+      fetch(`${HA_URL}/api/history/period/${startTimeStr}?filter_entity_id=${data.entity_id}&end_time=${endTimeStr}`, {
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      })
+        .then(res => res.json())
+        .then(response => {
+          if (response && response[0] && response[0].length > 0) {
+            // Get the last 3 unique state changes
+            const uniqueStates = new Map();
+            response[0].forEach(entry => {
+              if (entry.state && !uniqueStates.has(entry.state)) {
+                uniqueStates.set(entry.state, {
+                  message: entry.state,
+                  timestamp: new Date(entry.last_updated),
+                  timeAgo: getTimeAgo(new Date(entry.last_updated), now)
+                });
+              }
+            });
+            
+            // Convert to array and take last 3 entries
+            brandweerHistory = Array.from(uniqueStates.values())
+              .sort((a, b) => b.timestamp - a.timestamp)
+              .slice(0, 3);
+
+            // Update the display
+            const container = document.getElementById('brandweerNotifications');
+            if (brandweerHistory.length > 0) {
+              container.innerHTML = brandweerHistory.map(entry => `
+                <div class="brandweer-entry">
+                  <span class="material-icons">notifications_active</span>
+                  <div class="brandweer-content">
+                    <div>${entry.message}</div>
+                    <div class="brandweer-time">${entry.timeAgo}</div>
+                  </div>
+                </div>
+              `).join('');
+            } else {
+              container.innerHTML = ''; // Clear if no entries
+            }
+          } else {
+            // Fallback to current state if no history
+            const entry = {
+              message: data.attributes.message || data.state,
+              timestamp: new Date(data.last_changed),
+              timeAgo: getTimeAgo(new Date(data.last_changed), now)
+            };
+            brandweerHistory = [entry];
+            
+            const container = document.getElementById('brandweerNotifications');
+            container.innerHTML = `
+              <div class="brandweer-entry">
+                <span class="material-icons">notifications_active</span>
+                <div class="brandweer-content">
+                  <div>${entry.message}</div>
+                  <div class="brandweer-time">${entry.timeAgo}</div>
+                </div>
+              </div>
+            `;
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching history:', error);
+          // Fallback to current state if API call fails
+          const entry = {
+            message: data.attributes.message || data.state,
+            timestamp: new Date(data.last_changed),
+            timeAgo: getTimeAgo(new Date(data.last_changed), now)
+          };
+          brandweerHistory = [entry];
+          
+          const container = document.getElementById('brandweerNotifications');
+          container.innerHTML = `
+            <div class="brandweer-entry">
+              <span class="material-icons">notifications_active</span>
+              <div class="brandweer-content">
+                <div>${entry.message}</div>
+                <div class="brandweer-time">${entry.timeAgo}</div>
+              </div>
+            </div>
+          `;
+        });
+    }
+
+    function getTimeAgo(date, now) {
+      const seconds = Math.floor((now - date) / 1000);
+      
+      if (seconds < 60) return 'just now';
+      
+      const minutes = Math.floor(seconds / 60);
+      if (minutes < 60) return `${minutes}m ago`;
+      
+      const hours = Math.floor(minutes / 60);
+      if (hours < 24) return `${hours}h ago`;
+      
+      const days = Math.floor(hours / 24);
+      if (days < 7) return `${days}d ago`;
+      
+      return date.toLocaleDateString();
+    }
+  </script>
+</body>
+</html> 
