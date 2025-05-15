@@ -1,188 +1,86 @@
 # Lock Control Interface
 
-A simple web interface for controlling a lock via Home Assistant.
-
-![Lock Control Interface](lockcontrol.png)
-
-## Hardware Setup
-
-### Required Components
-- Shelly Plus 1 (or similar Shelly relay)
-- 220V AC to 12V DC Magnetic Lock Controller
-  - Input: 220V AC
-  - Output: 12V DC
-  - Features: Normally Open (NO) and Normally Closed (NC) contacts
-  - Manual override switch
-- 12V Magnetic Lock
-
-### Important Setup Notes
-1. Research and understand how to properly connect a Shelly Plus 1 to your specific magnetic lock controller
-2. Consult your magnetic lock controller's documentation for proper wiring instructions
-3. Ensure you understand the difference between fail-safe and fail-secure operation
-4. Always follow local electrical codes and safety regulations
-5. Consider consulting with a qualified electrician for installation
-
-### Home Assistant Configuration
-1. Add the Shelly Plus 1 to Home Assistant:
-   ```yaml
-   # Example configuration.yaml entry
-   shelly:
-     discovery: true
-   ```
-
-2. Create a lock entity in Home Assistant:
-   ```yaml
-   # Example lock.yaml
-   lock:
-     - platform: template
-       name: "Front Door Lock"
-       unique_id: front_door_lock
-       value_template: "{{ states('input_boolean.door_lock_state') }}"
-       lock:
-         service: switch.turn_on
-         target:
-           entity_id: switch.shelly_plus_1_relay_0
-       unlock:
-         service: switch.turn_off
-         target:
-           entity_id: switch.shelly_plus_1_relay_0
-   ```
-
-### Safety Considerations
-1. Always use a properly rated magnetic lock controller
-2. Ensure proper grounding of all components
-3. Use appropriate wire gauges for both AC and DC circuits
-4. Consider adding a backup power supply for the lock
-5. Test the manual override switch regularly
-6. Label all wires and connections clearly
-7. Consider adding a power indicator LED
-8. Install a circuit breaker for the AC input
-9. Never work on live electrical circuits
-10. Follow all manufacturer safety guidelines
-
-### Troubleshooting
-1. If the lock doesn't respond:
-   - Check AC power to the controller
-   - Verify DC output voltage (should be 12V)
-   - Check Shelly Plus 1 connection to NO/NC contacts
-   - Verify Shelly Plus 1 is connected to WiFi
-   - Check Home Assistant entity states
-
-2. If manual override doesn't work:
-   - Check switch connections
-   - Verify controller's manual override functionality
-   - Test with power disconnected
-
-## Interface Overview
-
-The interface provides a clean, modern UI for controlling your lock with the following features:
-
-### Main Controls
-- **Lock/Unlock Button**: Large toggle button that changes color and icon based on lock state
-  - Green when locked
-  - Red when unlocked
-  - Shows loading state during operations
-
-### Quick Access Timers
-- **10 Second Unlock**: Temporarily unlocks the door for 10 seconds
-- **30 Minute Unlock**: Keeps the door unlocked for 30 minutes
-- **Until Sunset**: Unlocks the door until the next sunset (only available during daytime)
-
-### Status Information
-- **Lock Status**: Shows current lock state with visual indicator
-- **Timer Display**: Shows countdown when a timer is active
-- **Info Bar**: Displays:
-  - Current time
-  - Current date
-  - Weather conditions
-  - Sunset time
-
-### Additional Features
-- **P2000 Notifications**: Shows recent emergency service notifications
-- **Garbage Collection**: Displays next day's garbage collection schedule
-- **Debug Mode**: Accessible via URL parameter `?debug` for testing time-based features
+A modern, mobile-friendly interface for controlling magnetic locks with Home Assistant integration.
 
 ## Features
 
-- Clean, modern UI with a lock/unlock button
-- Real-time status updates
-- Visual feedback for actions
-- Error handling and user notifications
-- Docker support with customizable paths
-- Easy configuration script
+- Real-time lock status monitoring
+- Multiple unlock duration options (10s, 30min, until sunset)
+- Mobile-friendly interface with touch support
+- Automatic timer management
+- Weather and time information
+- Brandweer (Fire Department) notifications
+- Garbage collection schedule display
+- Version checking and YAML update notifications
+
+## Mobile Support
+
+The interface is fully optimized for mobile devices with:
+- Touch-friendly controls
+- Responsive design
+- Mobile-specific optimizations
+- Debug panel for troubleshooting (🔍 button in bottom right)
+- Cache management tools
 
 ## Installation
 
-### Option 1: Using the Configuration Script (Recommended)
+1. Copy the `lockcontrol` folder to your Home Assistant's `www` directory
+2. Add the following to your `configuration.yaml`:
 
-1. Clone this repository
-2. Run the configuration script:
-   ```bash
-   ./update_config.sh
-   ```
-3. Follow the prompts to set up your configuration
-4. The script will guide you through the Docker path setup and file copying process
-
-### Option 2: Manual Installation
-
-1. Clone this repository
-2. Copy `config.js` to `config.local.js` and update the following values:
-   - `HA_TOKEN`: Your Home Assistant long-lived access token
-   - `HA_URL`: Your Home Assistant instance URL
-   - `DOCKER_PATH`: Your Home Assistant www directory path (default: /config/www/lockcontrol)
-
-## Home Assistant Integration
-
-### File Location
-Copy all files to your Home Assistant www directory. The location depends on your Home Assistant installation type:
-
-- **Home Assistant OS**: `/config/www/lockcontrol/`
-- **Home Assistant Container**: `/config/www/lockcontrol/`
-- **Home Assistant Supervised**: `/config/www/lockcontrol/`
-- **Home Assistant Core**: `/homeassistant/www/lockcontrol/`
-
-### Required Files
-Make sure to copy:
-- `lockcontrol.html` (main interface)
-- `config.local.js` (your configuration)
-- All other `.html` files
-- All `.js` files
-- All `.css` files
-
-### Docker Setup
-If using Docker, ensure your volume mount includes:
 ```yaml
-volumes:
-  - /path/to/your/config/www/lockcontrol:/config/www/lockcontrol
+input_text:
+  lockcontrol_daily_code:
+    name: Daily Code
+    max: 6
+  lockcontrol_one_time_code:
+    name: One Time Code
+    max: 6
+  version:
+    name: Version
+
+input_datetime:
+  lockcontrol_daily_code_expiry:
+    name: Daily Code Expiry
+    has_date: true
+    has_time: true
+  lockcontrol_one_time_code_expiry:
+    name: One Time Code Expiry
+    has_date: true
+    has_time: true
+  lock_unlock_end:
+    name: Lock Unlock End
+    has_date: true
+    has_time: true
 ```
 
-### Accessing the Interface
-After copying the files:
-1. Restart Home Assistant or reload the www folder
-2. Access the interface through your Home Assistant instance:
-   - If using Home Assistant's built-in web server: `http://your-ha-ip:8123/local/lockcontrol/lockcontrol.html`
-   - If using a reverse proxy: `https://your-domain/local/lockcontrol/lockcontrol.html`
-   - If using a custom web server: Configure according to your setup
+3. Create a `config.js` file in the `lockcontrol` directory with your Home Assistant token:
 
-### Local Development
-For local development and testing:
-1. Copy the files to your local web server directory
-2. Access via your local web server URL
-3. Make sure your Home Assistant instance is accessible from your development machine
+```javascript
+const config = {
+    HA_TOKEN: 'your_long_lived_access_token',
+    HA_URL: 'https://your-home-assistant-url',
+    VERSION: '2.0.0'
+};
+```
 
-## Security Notes
+## Usage
 
-- Never commit your `config.local.js` file with real credentials
-- Keep your Home Assistant token secure
-- Consider using HTTPS for your Home Assistant instance
-- Ensure proper file permissions (usually www-data:www-data)
+1. Access the interface through your Home Assistant instance at `/local/lockcontrol/lockcontrol.html`
+2. Use the interface to control your magnetic lock
+3. For mobile devices, use the debug panel (🔍) if you encounter any issues
 
-## Dependencies
+## Troubleshooting
 
-- Home Assistant instance
-- Modern web browser with JavaScript enabled
-- Docker (optional, for containerized setup)
+### Mobile Issues
+1. Click the 🔍 debug button in the bottom right
+2. Check the debug panel for error messages
+3. Use the "Clear Cache & Reload" button if needed
 
-## License
+### Configuration Issues
+1. Verify your `config.js` file is in the correct location
+2. Check the debug panel for config loading errors
+3. Ensure your Home Assistant token is valid
 
-GPL
+## Version Information
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes and version history.

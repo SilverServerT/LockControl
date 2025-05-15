@@ -6,122 +6,178 @@ GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 NC='\033[0m' # No Color
 
+# Configuration
+DEFAULT_CONFIG="config.js"
+CONFIG_FILE=""
+TEMPLATE_FILE="config.template.js"
+BACKUP_DIR="backups"
+TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
+FORCE_MODE=false
+AUTO_CONFIRM=false
+
+# Parse command line arguments
+while getopts "fy" opt; do
+  case $opt in
+    f)
+      FORCE_MODE=true
+      ;;
+    y)
+      AUTO_CONFIRM=true
+      ;;
+    \?)
+      echo "Invalid option: -$OPTARG" >&2
+      exit 1
+      ;;
+  esac
+done
+
+# Get the input file from the first non-option argument
+shift $((OPTIND-1))
+if [ ! -z "$1" ]; then
+    CONFIG_FILE="$1"
+else
+    CONFIG_FILE="$DEFAULT_CONFIG"
+fi
+
+# Function to create backup
+create_backup() {
+    if [ ! -d "$BACKUP_DIR" ]; then
+        mkdir -p "$BACKUP_DIR"
+    fi
+    cp "$CONFIG_FILE" "$BACKUP_DIR/${CONFIG_FILE%.*}_${TIMESTAMP}.js"
+    echo "Created backup: $BACKUP_DIR/${CONFIG_FILE%.*}_${TIMESTAMP}.js"
+}
+
+# Function to update config
+update_config() {
+    if [ -f "$CONFIG_FILE" ]; then
+        create_backup
+    fi
+
+    # Create new config file from template
+    cp "$TEMPLATE_FILE" "$CONFIG_FILE"
+    echo "Created new config file from template"
+}
+
+# Function to show summary
+show_summary() {
+    echo -e "\n=== Update Summary ==="
+    echo "1. Backup created: $BACKUP_DIR/${CONFIG_FILE%.*}_${TIMESTAMP}.js"
+    echo "2. New config file created from template"
+    echo "3. Next steps:"
+    echo "   - Verify the new config file"
+    echo "   - Update any custom settings"
+    echo "   - Restart the application"
+    echo "====================="
+}
+
 echo -e "${YELLOW}Lock Control Configuration Update Script${NC}"
-echo "This script will help you set up your configuration file."
+echo "Using config file: $CONFIG_FILE"
 
-# Function to validate keypad code
-validate_keypad_code() {
-    local code=$1
-    # Remove any non-numeric characters
-    code=$(echo "$code" | tr -cd '0-9')
-    
-    # Check if code is empty
-    if [ -z "$code" ]; then
-        return 1
-    fi
-    
-    # Check if code is within valid range (4-8 digits)
-    if [ ${#code} -ge 4 ] && [ ${#code} -le 8 ]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
-# Function to format keypad code
-format_keypad_code() {
-    local code=$1
-    # Remove any non-numeric characters
-    code=$(echo "$code" | tr -cd '0-9')
-    
-    # Format as 4-8 digit code
-    if [ ${#code} -ge 4 ] && [ ${#code} -le 8 ]; then
-        echo "$code"
-    else
-        return 1
-    fi
-}
-
-# Default path
-DEFAULT_PATH="/var/lib/docker/volumes/hass_config/_data/www/admin-dashboard"
-CURRENT_DIR=$(pwd)
-
-# Function to extract value from config.local.js
+# Function to extract value from config file
 extract_config_value() {
     local key=$1
-    local value=$(grep -o "${key}: '[^']*'" config.local.js 2>/dev/null | cut -d"'" -f2)
+    local value=$(grep -o "${key}: '[^']*'" "$CONFIG_FILE" 2>/dev/null | cut -d"'" -f2)
     echo "$value"
 }
 
-# Check for existing config.local.js and read values
-if [ -f "config.local.js" ]; then
-    echo -e "${YELLOW}Found existing config.local.js${NC}"
+# Check for existing config file and read values
+if [ -f "$CONFIG_FILE" ]; then
+    echo -e "${YELLOW}Found existing $CONFIG_FILE${NC}"
     EXISTING_PATH=$(extract_config_value "DOCKER_PATH")
     EXISTING_URL=$(extract_config_value "HA_URL")
     EXISTING_TOKEN=$(extract_config_value "HA_TOKEN")
     
-    if [ ! -z "$EXISTING_PATH" ]; then
-        DEFAULT_PATH=$EXISTING_PATH
-        echo "Found existing path: $EXISTING_PATH"
-        read -p "Do you want to use a different path? (y/N) " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            HA_PATH=$EXISTING_PATH
-        else
-            read -p "Enter the new target directory path: " HA_PATH
-            if [ -z "$HA_PATH" ]; then
-                echo -e "${RED}Error: Path is required.${NC}"
-                exit 1
-            fi
-        fi
+    if [ "$FORCE_MODE" = true ] || [ "$AUTO_CONFIRM" = true ]; then
+        # Use existing values without prompts
+        HA_PATH=$EXISTING_PATH
+        HA_URL=$EXISTING_URL
+        HA_TOKEN=$EXISTING_TOKEN
     else
-        read -p "Enter the target directory path (press Enter for default: $DEFAULT_PATH): " HA_PATH
-        HA_PATH=${HA_PATH:-$DEFAULT_PATH}
+        # Interactive mode with prompts
+        if [ ! -z "$EXISTING_PATH" ]; then
+            DEFAULT_PATH=$EXISTING_PATH
+            echo "Found existing path: $EXISTING_PATH"
+            read -p "Do you want to use a different path? (y/N) " -n 1 -r
+            echo
+            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+                HA_PATH=$EXISTING_PATH
+            else
+                read -p "Enter the new target directory path: " HA_PATH
+                if [ -z "$HA_PATH" ]; then
+                    echo -e "${RED}Error: Path is required.${NC}"
+                    exit 1
+                fi
+            fi
+        else
+            read -p "Enter the target directory path (press Enter for default: $DEFAULT_PATH): " HA_PATH
+            HA_PATH=${HA_PATH:-$DEFAULT_PATH}
+        fi
+
+        # Get Home Assistant URL
+        if [ ! -z "$EXISTING_URL" ]; then
+            read -p "Enter your Home Assistant URL (press Enter for existing: $EXISTING_URL): " HA_URL
+            HA_URL=${HA_URL:-$EXISTING_URL}
+        else
+            read -p "Enter your Home Assistant URL (e.g., https://ha.silverserver.nl): " HA_URL
+        fi
+
+        # Get Home Assistant token
+        if [ ! -z "$EXISTING_TOKEN" ]; then
+            read -p "Enter your Home Assistant long-lived access token (press Enter to keep existing): " HA_TOKEN
+            HA_TOKEN=${HA_TOKEN:-$EXISTING_TOKEN}
+        else
+            read -p "Enter your Home Assistant long-lived access token: " HA_TOKEN
+        fi
     fi
 else
-    read -p "Enter the target directory path (press Enter for default: $DEFAULT_PATH): " HA_PATH
-    HA_PATH=${HA_PATH:-$DEFAULT_PATH}
-fi
-
-echo -e "${YELLOW}Selected path: ${HA_PATH}${NC}"
-
-# Get Home Assistant URL
-if [ ! -z "$EXISTING_URL" ]; then
-    read -p "Enter your Home Assistant URL (press Enter for existing: $EXISTING_URL): " HA_URL
-    HA_URL=${HA_URL:-$EXISTING_URL}
-else
-    read -p "Enter your Home Assistant URL (e.g., https://ha.silverserver.nl): " HA_URL
-fi
-
-if [ -z "$HA_URL" ]; then
-    echo -e "${RED}Error: Home Assistant URL is required.${NC}"
+    echo -e "${RED}Error: Config file not found: $CONFIG_FILE${NC}"
     exit 1
 fi
 
-# Get Home Assistant token
-if [ ! -z "$EXISTING_TOKEN" ]; then
-    read -p "Enter your Home Assistant long-lived access token (press Enter to keep existing): " HA_TOKEN
-    HA_TOKEN=${HA_TOKEN:-$EXISTING_TOKEN}
-else
-    read -p "Enter your Home Assistant long-lived access token: " HA_TOKEN
+# Ensure URL starts with https://
+if [[ ! "$HA_URL" =~ ^https:// ]]; then
+    if [[ "$HA_URL" =~ ^http:// ]]; then
+        HA_URL="https://${HA_URL#http://}"
+    else
+        HA_URL="https://${HA_URL}"
+    fi
 fi
 
-if [ -z "$HA_TOKEN" ]; then
-    echo -e "${RED}Error: Home Assistant token is required.${NC}"
+# Remove trailing slash if present
+HA_URL=${HA_URL%/}
+
+if [ -z "$HA_URL" ] || [ -z "$HA_TOKEN" ] || [ -z "$HA_PATH" ]; then
+    echo -e "${RED}Error: Missing required values in config file: $CONFIG_FILE${NC}"
     exit 1
 fi
 
-# Create config.local.js
-cat > config.local.js << EOL
+echo -e "${YELLOW}Using values from config:${NC}"
+echo "HA_URL: ${HA_URL}"
+echo "HA_TOKEN: ${HA_TOKEN:0:10}...${HA_TOKEN: -5}"
+echo "DOCKER_PATH: ${HA_PATH}"
+
+# Create config file
+cat > "$CONFIG_FILE" << EOL
 // Home Assistant Configuration
 const config = {
     HA_TOKEN: '${HA_TOKEN}',
     HA_URL: '${HA_URL}',
     DOCKER_PATH: '${HA_PATH}',
-    KEYPAD_FORMAT: 'numeric', // numeric keypad format (4-8 digits)
-    KEYPAD_VALIDATION: true,
-    MIN_CODE_LENGTH: 4,
-    MAX_CODE_LENGTH: 8
+    VERSION: '2.0.0',
+    timezone: 'Europe/Amsterdam',
+    codeLength: 6,
+    maxAttempts: 3,
+    lockoutDuration: 300,
+    codeExpiry: 86400,
+    tasmotaSwitch: 'tasmota.switch',
+    simulationMode: true,
+    stateEntities: {
+        dailyCode: 'input_text.lockcontrol_daily_code',
+        dailyCodeExpiry: 'input_datetime.lockcontrol_daily_code_expiry',
+        oneTimeCode: 'input_text.lockcontrol_one_time_code',
+        oneTimeCodeExpiry: 'input_datetime.lockcontrol_one_time_code_expiry'
+    }
 };
 
 // Prevent modification of the config object
@@ -129,80 +185,44 @@ Object.freeze(config);
 EOL
 
 # Set proper permissions
-chmod 600 config.local.js
+chmod 600 "$CONFIG_FILE"
 
-echo -e "${GREEN}Configuration file created successfully!${NC}"
-echo -e "${YELLOW}Important:${NC}"
-echo "1. Make sure config.local.js is in your .gitignore"
-echo "2. Never commit this file to version control"
-echo "3. Keep your token secure"
-echo "4. Path is set to: ${HA_PATH}"
-echo "5. Keypad format is set to numeric (4-8 digits)"
+echo -e "${GREEN}Configuration file updated successfully!${NC}"
 
-# Verify .gitignore
-if grep -q "config.local.js" .gitignore; then
-    echo -e "${GREEN}config.local.js is properly ignored in .gitignore${NC}"
-else
-    echo -e "${YELLOW}Warning: config.local.js is not in .gitignore${NC}"
-    read -p "Do you want to add it now? (y/N) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "config.local.js" >> .gitignore
-        echo -e "${GREEN}Added to .gitignore${NC}"
-    fi
-fi
-
-# Create directory structure
+# Create directory structure and copy files
 echo -e "${YELLOW}Creating directory structure...${NC}"
 mkdir -p "${HA_PATH}/accesscontrol"
 
 # Copy files
 echo -e "${YELLOW}Copying files...${NC}"
-cp -v lockcontrol.html "${HA_PATH}/"
-cp -v lockcontrolv2.html "${HA_PATH}/"
-cp -v admin_panel.html "${HA_PATH}/"
-cp -v config.local.js "${HA_PATH}/"
-cp -v config.template "${HA_PATH}/"
-cp -v keylock_reader.yaml "${HA_PATH}/"
-cp -v accesscontrol/access_control.yaml "${HA_PATH}/accesscontrol/"
-cp -v accesscontrol/access_control_iterations.yaml "${HA_PATH}/accesscontrol/"
+cp -f lockcontrol.html "${HA_PATH}/"
+cp -f lockcontrolv2.html "${HA_PATH}/"
+cp -f admin_panel.html "${HA_PATH}/"
+cp -f "$CONFIG_FILE" "${HA_PATH}/"
+cp -f config.template "${HA_PATH}/"
+cp -f keylock_reader.yaml "${HA_PATH}/"
+cp -f accesscontrol/access_control.yaml "${HA_PATH}/accesscontrol/"
+cp -f accesscontrol/access_control_iterations.yaml "${HA_PATH}/accesscontrol/"
 
 # Set permissions
 echo -e "${YELLOW}Setting permissions...${NC}"
 chmod 644 "${HA_PATH}"/*.html
 chmod 644 "${HA_PATH}"/*.yaml
 chmod 644 "${HA_PATH}/accesscontrol"/*.yaml
-chmod 600 "${HA_PATH}/config.local.js"
+chmod 600 "${HA_PATH}/$CONFIG_FILE"
 
-echo
-echo -e "${YELLOW}Setup Instructions:${NC}"
-echo "1. Files have been copied to: ${HA_PATH}"
-echo
-echo "2. Directory structure:"
-echo "   ${HA_PATH}/"
-echo "   ├── lockcontrol.html"
-echo "   ├── lockcontrolv2.html"
-echo "   ├── admin_panel.html"
-echo "   ├── config.local.js"
-echo "   ├── config.template"
-echo "   ├── keylock_reader.yaml"
-echo "   └── accesscontrol/"
-echo "       ├── access_control.yaml"
-echo "       └── access_control_iterations.yaml"
-echo
-echo "3. After copying, restart Home Assistant or reload the www folder"
-echo "4. Access the interfaces:"
-echo "   - Main interface: ${HA_URL}/local/admin-dashboard/lockcontrol.html"
-echo "   - New interface: ${HA_URL}/local/admin-dashboard/lockcontrolv2.html"
-echo "   - Admin panel: ${HA_URL}/local/admin-dashboard/admin_panel.html"
-echo
-echo -e "${YELLOW}Note:${NC} Make sure the directory has the correct permissions"
-echo "      (usually www-data:www-data for Home Assistant installations)"
-echo
-echo -e "${YELLOW}Keypad Code Information:${NC}"
-echo "The system is configured to use numeric keypad codes:"
-echo "- Codes must be 4-8 digits long"
-echo "- Only numbers 0-9 are allowed"
-echo "- Example codes: 1234, 567890, 12345678"
-echo
+# Ensure proper ownership
+echo -e "${YELLOW}Setting ownership...${NC}"
+if [ -d "/var/lib/docker" ]; then
+    chown www-data:www-data "${HA_PATH}"/*.html
+    chown www-data:www-data "${HA_PATH}"/*.yaml
+    chown www-data:www-data "${HA_PATH}/accesscontrol"/*.yaml
+    chown www-data:www-data "${HA_PATH}/$CONFIG_FILE"
+else
+    chown $(whoami):$(whoami) "${HA_PATH}"/*.html
+    chown $(whoami):$(whoami) "${HA_PATH}"/*.yaml
+    chown $(whoami):$(whoami) "${HA_PATH}/accesscontrol"/*.yaml
+    chown $(whoami):$(whoami) "${HA_PATH}/$CONFIG_FILE"
+fi
+
 echo -e "${GREEN}Setup complete!${NC}" 

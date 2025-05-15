@@ -309,7 +309,7 @@
     <div class="container">
         <div class="header">
             <h1>Advanced Access Control</h1>
-            <div class="version">v1.0.1</div>
+            <div class="version">v2.0.0</div>
         </div>
 
         <div class="grid">
@@ -363,14 +363,15 @@
             timezone: "Europe/Amsterdam",
             tasmotaSwitch: "tasmota.switch",
             simulationMode: true,
-            haUrl: window.location.origin,
-            haToken: "",
+            HA_URL: window.location.origin.replace('http://', 'https://'),
+            HA_TOKEN: "",
             stateEntities: {
-                dailyCode: "input_text.daily_code",
-                dailyCodeExpiry: "input_datetime.daily_code_expiry",
-                oneTimeCode: "input_text.one_time_code",
-                oneTimeCodeExpiry: "input_datetime.one_time_code_expiry"
-            }
+                dailyCode: "input_text.lockcontrol_daily_code",
+                dailyCodeExpiry: "input_datetime.lockcontrol_daily_code_expiry",
+                oneTimeCode: "input_text.lockcontrol_one_time_code",
+                oneTimeCodeExpiry: "input_datetime.lockcontrol_one_time_code_expiry"
+            },
+            VERSION: '2.0.0'
         };
 
         // State
@@ -380,6 +381,8 @@
         let isLockedOut = false;
         let lockoutEndTime = null;
         let enteredCode = '';
+        let currentState = 'off';
+        let timerInterval = null;
 
         // DOM Elements
         const dailyCodeDisplay = document.getElementById('dailyCode');
@@ -480,34 +483,201 @@
             setTimeout(() => successDiv.remove(), duration);
         }
 
-        // Load configuration from config.local.js with error handling
+        // Add a function to show token validation status
+        function showTokenStatus(isValid, message) {
+            if (!/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) return; // Only show on mobile
+            
+            const statusDiv = document.createElement('div');
+            statusDiv.id = 'tokenStatus';
+            statusDiv.style.cssText = `
+                position: fixed;
+                top: 10px;
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 10px 20px;
+                border-radius: 8px;
+                background: ${isValid ? 'rgba(56, 142, 60, 0.9)' : 'rgba(211, 47, 47, 0.9)'};
+                color: white;
+                font-weight: 500;
+                z-index: 1000;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            `;
+            
+            statusDiv.innerHTML = `
+                <span class="material-icons">${isValid ? 'check_circle' : 'error'}</span>
+                ${message}
+            `;
+            
+            document.body.appendChild(statusDiv);
+            
+            // Remove after 5 seconds
+            setTimeout(() => {
+                statusDiv.style.opacity = '0';
+                statusDiv.style.transition = 'opacity 0.5s ease-out';
+                setTimeout(() => statusDiv.remove(), 500);
+            }, 5000);
+        }
+
+        // Load configuration from config file
         async function loadConfig() {
             try {
-                const response = await fetch('config.local.js');
-                if (!response.ok) {
-                    throw new Error(`Failed to load config: ${response.status}`);
+                showTokenStatus(false, 'Loading configuration...');
+                console.log('Device info:', {
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
+                });
+
+                // Add cache-busting parameter and force reload
+                const timestamp = new Date().getTime();
+                const configPaths = [
+                    `config.js?t=${timestamp}`,
+                    `../config.js?t=${timestamp}`,
+                    '/local/lockcontrol/config.js?t=' + timestamp,
+                    '/local/config.js?t=' + timestamp
+                ];
+
+                let configLoaded = false;
+                for (const path of configPaths) {
+                    try {
+                        console.log('Trying to load config from:', path);
+                        const response = await fetch(path, {
+                            method: 'GET',
+                            headers: {
+                                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                                'Pragma': 'no-cache',
+                                'Expires': '0'
+                            }
+                        });
+                        
+                        if (response.ok) {
+                            const text = await response.text();
+                            console.log('Successfully loaded config from:', path);
+                            
+                            // Try to find token in JavaScript format first
+                            let match = text.match(/HA_TOKEN:\s*'([^']+)'/);
+                            if (!match) {
+                                match = text.match(/HA_TOKEN=([^\s]+)/);
+                            }
+                            
+                            if (match) {
+                                config.HA_TOKEN = match[1];
+                                console.log('Token found and set from file');
+                                
+                                // Store token in localStorage as backup
+                                try {
+                                    localStorage.setItem('ha_token', config.HA_TOKEN);
+                                    console.log('Token stored in localStorage');
+                                } catch (e) {
+                                    console.warn('Could not store token in localStorage:', e);
+                                }
+                            }
+
+                            // Try to find URL in JavaScript format first
+                            let urlMatch = text.match(/HA_URL:\s*'([^']+)'/);
+                            if (!urlMatch) {
+                                urlMatch = text.match(/HA_URL=([^\s]+)/);
+                            }
+                            
+                            if (urlMatch) {
+                                config.HA_URL = urlMatch[1];
+                                console.log('URL found and set from file:', config.HA_URL);
+                                
+                                // Store URL in localStorage as backup
+                                try {
+                                    localStorage.setItem('ha_url', config.HA_URL);
+                                    console.log('URL stored in localStorage');
+                                } catch (e) {
+                                    console.warn('Could not store URL in localStorage:', e);
+                                }
+                            }
+                            
+                            configLoaded = true;
+                            break;
+                        }
+                    } catch (e) {
+                        console.warn(`Failed to load config from ${path}:`, e);
+                    }
                 }
-                const text = await response.text();
-                const match = text.match(/HA_TOKEN:\s*'([^']+)'/);
-                if (match) {
-                    config.haToken = match[1];
-                } else {
-                    throw new Error('HA_TOKEN not found in config.local.js');
+
+                if (!configLoaded) {
+                    console.log('Failed to load config from any path, trying localStorage');
+                    // Try to recover from localStorage
+                    const storedToken = localStorage.getItem('ha_token');
+                    const storedUrl = localStorage.getItem('ha_url');
+                    
+                    if (storedToken) {
+                        console.log('Using token from localStorage');
+                        config.HA_TOKEN = storedToken;
+                    }
+                    if (storedUrl) {
+                        console.log('Using URL from localStorage');
+                        config.HA_URL = storedUrl;
+                    }
+                    
+                    if (!storedToken || !storedUrl) {
+                        throw new Error('Could not load configuration from any source');
+                    }
                 }
+
+                // Verify we have the required values
+                if (!config.HA_TOKEN || !config.HA_URL) {
+                    showTokenStatus(false, 'Missing configuration values');
+                    throw new Error('Missing required configuration values');
+                }
+
+                console.log('Configuration loaded successfully:', {
+                    url: config.HA_URL,
+                    hasToken: !!config.HA_TOKEN,
+                    tokenLength: config.HA_TOKEN.length
+                });
+
+                // After successful config load
+                showTokenStatus(true, 'Configuration loaded');
+
             } catch (error) {
                 console.error('Error loading config:', error);
-                showError('Failed to load configuration. Please check config.local.js');
+                showTokenStatus(false, 'Configuration load failed: ' + error.message);
+                showError('Failed to load configuration. Please check your config file and try clearing your browser cache.');
                 throw error;
             }
+        }
+
+        // Add a function to clear cache and reload
+        function clearCacheAndReload() {
+            try {
+                localStorage.clear();
+                sessionStorage.clear();
+                window.location.reload(true);
+            } catch (e) {
+                console.error('Error clearing cache:', e);
+                window.location.reload(true);
+            }
+        }
+
+        // Add token status to the clear cache button
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            const clearButton = document.createElement('button');
+            clearButton.className = 'button warning';
+            clearButton.style.marginTop = '10px';
+            clearButton.innerHTML = '<span class="material-icons">cleaning_services</span> Clear Cache & Reload';
+            clearButton.onclick = () => {
+                showTokenStatus(false, 'Clearing cache...');
+                clearCacheAndReload();
+            };
+            document.querySelector('.container').appendChild(clearButton);
         }
 
         // Home Assistant API calls with error handling
         async function callHAService(domain, service, data) {
             try {
-                const response = await fetch(`${config.haUrl}/api/services/${domain}/${service}`, {
+                const response = await fetch(`${config.HA_URL}/api/services/${domain}/${service}`, {
                     method: 'POST',
                     headers: {
-                        'Authorization': `Bearer ${config.haToken}`,
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify(data)
@@ -528,9 +698,9 @@
 
         async function getHAState(entityId) {
             try {
-                const response = await fetch(`${config.haUrl}/api/states/${entityId}`, {
+                const response = await fetch(`${config.HA_URL}/api/states/${entityId}`, {
                     headers: {
-                        'Authorization': `Bearer ${config.haToken}`
+                        'Authorization': `Bearer ${config.HA_TOKEN}`
                     }
                 });
                 
@@ -574,10 +744,35 @@
             }
         }
 
+        // Verify authentication
+        async function verifyAuth() {
+            try {
+                showTokenStatus(false, 'Validating token...');
+                const response = await fetch(`${config.HA_URL}/api/`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                if (!response.ok) {
+                    showTokenStatus(false, 'Token validation failed');
+                    throw new Error(`Authentication failed: ${response.status}`);
+                }
+                console.log('Authentication successful');
+                showTokenStatus(true, 'Token validated successfully');
+                return true;
+            } catch (error) {
+                console.error('Authentication error:', error);
+                showTokenStatus(false, 'Token validation failed: ' + error.message);
+                return false;
+            }
+        }
+
         // Load saved state from Home Assistant with error handling
         async function loadSavedState() {
             try {
                 await loadConfig();
+                const isAuthenticated = await verifyAuth();
+                if (!isAuthenticated) {
+                    throw new Error('Authentication failed');
+                }
                 
                 const savedDailyCode = await getHAState(config.stateEntities.dailyCode);
                 const savedDailyCodeExpiry = await getHAState(config.stateEntities.dailyCodeExpiry);
@@ -829,6 +1024,12 @@
         // Initialize with error handling
         async function init() {
             try {
+                await loadConfig();
+                const isAuthenticated = await verifyAuth();
+                if (!isAuthenticated) {
+                    throw new Error('Authentication failed');
+                }
+                
                 await loadSavedState();
                 updateAttemptsDisplay();
                 setInterval(() => updateDailyCode(), 60000); // Check daily code expiry every minute
@@ -836,6 +1037,10 @@
                 if (config.simulationMode) {
                     addKeypadSimulation();
                 }
+                
+                // Check YAML version
+                checkYamlVersion();
+                
                 showSuccess('System initialized successfully');
             } catch (error) {
                 console.error('Error initializing system:', error);
@@ -845,6 +1050,105 @@
 
         // Initialize the system
         init();
+
+        // Update version number on load
+        document.getElementById('versionNumber').textContent = `v${config.VERSION}`;
+
+        // Add version info to the UI
+        const versionInfo = document.createElement('div');
+        versionInfo.className = 'version-info';
+        versionInfo.style.cssText = 'text-align: center; margin-top: 10px; font-size: 0.8em; color: #888; opacity: 0.5;';
+        versionInfo.innerHTML = `
+            <span class="material-icons" style="font-size: 0.9em; vertical-align: middle;">info</span>
+            <span id="versionNumber">v${config.VERSION}</span>
+            <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800;">(YAML update required)</span>
+        `;
+        document.body.appendChild(versionInfo);
+
+        // Check if YAML has been updated
+        async function checkYamlVersion() {
+            try {
+                const response = await fetch(`${config.HA_URL}/api/states/input_text.version`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                if (!response.ok) {
+                    // If the entity doesn't exist, show the warning
+                    document.getElementById('versionStatus').style.display = 'inline';
+                    document.querySelector('.version-info').style.opacity = '0.5';
+                    return;
+                }
+                const data = await response.json();
+                if (data.state === config.VERSION) {
+                    // If versions match, hide the warning
+                    document.getElementById('versionStatus').style.display = 'none';
+                    document.querySelector('.version-info').style.opacity = '1';
+                } else {
+                    // If versions don't match, show the warning
+                    document.getElementById('versionStatus').style.display = 'inline';
+                    document.querySelector('.version-info').style.opacity = '0.5';
+                }
+            } catch (error) {
+                console.error('Error checking YAML version:', error);
+                // On error, show the warning
+                document.getElementById('versionStatus').style.display = 'inline';
+                document.querySelector('.version-info').style.opacity = '0.5';
+            }
+        }
+
+        function getLockState(backgroundPoll = false) {
+            if (!backgroundPoll) {
+                setControlsEnabled(false);
+                showLoading(true);
+            }
+            
+            // Use the correct sensor name from config
+            const sensorName = config.tasmotaSwitch;
+            console.log('Fetching lock state from:', sensorName);
+            
+            fetch(`${config.HA_URL}/api/states/${sensorName}`, {
+                headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+            })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`Failed to fetch lock state: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    console.log('Lock state response:', data);
+                    currentState = data.state;
+                    updateLockStatus();
+                    if (!backgroundPoll) {
+                        setControlsEnabled(true);
+                        showLoading(false);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching lock state:', error);
+                    document.getElementById('lockStatusText').textContent = 'Error fetching status';
+                    document.getElementById('lockStatusText').className = 'status-text';
+                    if (!backgroundPoll) {
+                        setControlsEnabled(false);
+                        showLoading(true);
+                    }
+                    showTokenStatus(false, 'Failed to fetch lock state: ' + error.message);
+                });
+        }
+
+        function toggleLock() {
+            if (currentState === 'on') {
+                callService('switch.turn_off', { entity_id: config.tasmotaSwitch });
+            } else if (currentState === 'off') {
+                // When manually locking, clear any active timer
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                clearTimerState().then(() => {
+                    callService('switch.turn_on', { entity_id: config.tasmotaSwitch });
+                });
+            }
+        }
     </script>
 </body>
 </html> 

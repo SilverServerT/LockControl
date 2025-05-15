@@ -1,5 +1,5 @@
 # Advanced Wiegand Access Control System
-# Version 1.0.1
+# Version 2.0.0
 
 # Core Switch Configuration
 switch:
@@ -45,8 +45,8 @@ sensor:
 
 # Input Text Configuration
 input_text:
-  daily_code:
-    name: "Daily Access Code"
+  lockcontrol_daily_code:
+    name: "Lock Control Daily Access Code"
     max: 6
     min: 6
     pattern: "[0-9]*"
@@ -62,7 +62,7 @@ input_text:
     max: 10
     min: 1
     mode: text
-    initial: "1.0.1"
+    initial: "2.0.0"
 
 # Input Number Configuration
 input_number:
@@ -97,6 +97,14 @@ input_datetime:
     has_date: true
     has_time: true
     initial: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+  lockcontrol_daily_code_expiry:
+    name: "Lock Control Daily Code Expiry"
+    has_date: true
+    has_time: true
+  lockcontrol_one_time_code_expiry:
+    name: "Lock Control One Time Code Expiry"
+    has_date: true
+    has_time: true
 
 # Input Boolean Configuration
 input_boolean:
