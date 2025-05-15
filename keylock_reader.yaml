@@ -1,0 +1,11 @@
+# Tasmota does not natively support Wiegand, but if your device is running Tasmota with Wiegand support (or a keypad/RFID module),
+# you can use Tasmota rules to publish codes to MQTT. Below is an example for a keypad or RFID reader on Tasmota:
+
+# In Tasmota Console, set up a rule to publish the code to MQTT when a code is read.
+# Example (for a keypad on Tasmota):
+# Rule1 ON Tele-Keypad#Data DO Publish keylock/access_code,%value% ENDON
+# Rule1 1
+
+# If you have a custom Tasmota build with Wiegand support, adapt the rule accordingly.
+
+# No YAML is needed for Tasmota device config; configure via Tasmota web UI or console. 2

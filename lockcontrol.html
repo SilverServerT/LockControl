@@ -383,32 +383,102 @@
       <span class="material-icons">delete</span>
       <span id="garbageContainerInfo">--</span>
     </div>
+    <!-- Add version number -->
+    <div class="version-info" style="text-align: center; margin-top: 10px; font-size: 0.8em; color: #888; opacity: 0.5;">
+      <span class="material-icons" style="font-size: 0.9em; vertical-align: middle;">info</span>
+      <span id="versionNumber">v1.0.1</span>
+      <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800;">(YAML update required)</span>
+    </div>
   </div>
 
   <!-- Load configuration first -->
-  <script src="config.js"></script>
   <script>
     // Configuration object
-    const HA_URL = 'https://ha.silverserver.nl';
-    const HA_TOKEN = config.HA_TOKEN;
-    const ENTITY_ID = 'switch.tasmota';
+    const config = {
+        HA_TOKEN: '',
+        HA_URL: window.location.origin,
+        VERSION: '1.0.1'  // Add version to config
+    };
+
+    // Update version number on load
+    document.getElementById('versionNumber').textContent = `v${config.VERSION}`;
+
+    // Check if YAML has been updated
+    async function checkYamlVersion() {
+        try {
+            const response = await fetch(`${config.HA_URL}/api/states/input_text.version`, {
+                headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+            });
+            if (!response.ok) {
+                // If the entity doesn't exist, show the warning
+                document.getElementById('versionStatus').style.display = 'inline';
+                document.querySelector('.version-info').style.opacity = '0.5';
+                return;
+            }
+            const data = await response.json();
+            if (data.state === config.VERSION) {
+                // If versions match, hide the warning
+                document.getElementById('versionStatus').style.display = 'none';
+                document.querySelector('.version-info').style.opacity = '1';
+            } else {
+                // If versions don't match, show the warning
+                document.getElementById('versionStatus').style.display = 'inline';
+                document.querySelector('.version-info').style.opacity = '0.5';
+            }
+        } catch (error) {
+            console.error('Error checking YAML version:', error);
+            // On error, show the warning
+            document.getElementById('versionStatus').style.display = 'inline';
+            document.querySelector('.version-info').style.opacity = '0.5';
+        }
+    }
+
+    // Load configuration from config.js
+    async function loadConfig() {
+        try {
+            const response = await fetch('config.local.js');
+            if (!response.ok) {
+                throw new Error(`Failed to load config: ${response.status}`);
+            }
+            const text = await response.text();
+            const match = text.match(/HA_TOKEN:\s*'([^']+)'/);
+            if (match) {
+                config.HA_TOKEN = match[1];
+            } else {
+                throw new Error('HA_TOKEN not found in config.local.js');
+            }
+        } catch (error) {
+            console.error('Error loading config:', error);
+            alert('Failed to load configuration. Please check config.local.js');
+            throw error;
+        }
+    }
 
     // Initialize the application
-    function initializeApp() {
-      // Initialize the rest of your application
-      getLockState(false);
-      setInterval(() => {
-        getLockState(true);
-        if (currentState !== 'on') {
-          initializeTimer();
-        }
-      }, 60000);
+    async function initializeApp() {
+        try {
+            await loadConfig();
+            // Initialize the rest of your application
+            getLockState(false);
+            setInterval(() => {
+                getLockState(true);
+                if (currentState !== 'on') {
+                    initializeTimer();
+                }
+            }, 60000);
 
-      updateSunsetTime();
-      setInterval(updateSunsetTime, 3600000);
-      initializeTimer();
-      updateInfoBar();
-      setInterval(updateInfoBar, 60000);
+            updateSunsetTime();
+            setInterval(updateSunsetTime, 3600000);
+            initializeTimer();
+            updateInfoBar();
+            setInterval(updateInfoBar, 60000);
+            
+            // Check YAML version
+            checkYamlVersion();
+        } catch (error) {
+            console.error('Error initializing app:', error);
+            alert('Failed to initialize application. Please check the console for details.');
+        }
     }
 
     // Start the application
@@ -436,10 +506,10 @@
         datetime: '2025-01-01 00:00:00'
       };
       
-      return fetch(`${HA_URL}/api/services/input_datetime/set_datetime`, {
+      return fetch(`${config.HA_URL}/api/services/input_datetime/set_datetime`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Authorization': `Bearer ${config.HA_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data)
@@ -488,10 +558,10 @@
     function callService(service, data) {
       setControlsEnabled(false);
       showLoading(true);
-      return fetch(`${HA_URL}/api/services/${service.split('.')[0]}/${service.split('.')[1]}`, {
+      return fetch(`${config.HA_URL}/api/services/${service.split('.')[0]}/${service.split('.')[1]}`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Authorization': `Bearer ${config.HA_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data)
@@ -507,8 +577,8 @@
         setControlsEnabled(false);
         showLoading(true);
       }
-      fetch(`${HA_URL}/api/states/${ENTITY_ID}`, {
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      fetch(`${config.HA_URL}/api/states/switch.tasmota`, {
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
       })
         .then(res => res.json())
         .then(data => {
@@ -533,10 +603,10 @@
       console.log('Getting stored timer state');
       console.log('Current device timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
       
-      return fetch(`${HA_URL}/api/states/input_datetime.lock_unlock_end`, {
+      return fetch(`${config.HA_URL}/api/states/input_datetime.lock_unlock_end`, {
         method: 'GET',
         headers: { 
-          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Authorization': `Bearer ${config.HA_TOKEN}`,
           'Content-Type': 'application/json'
         }
       })
@@ -592,8 +662,8 @@
           }
           
           // Calculate time until sunset
-          return fetch(`${HA_URL}/api/states/sun.sun`, {
-            headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+          return fetch(`${config.HA_URL}/api/states/sun.sun`, {
+            headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
           })
           .then(res => res.json())
           .then(sunData => {
@@ -637,10 +707,10 @@
       };
       console.log('Sending data to Home Assistant:', data);
       
-      return fetch(`${HA_URL}/api/services/input_datetime/set_datetime`, {
+      return fetch(`${config.HA_URL}/api/services/input_datetime/set_datetime`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${HA_TOKEN}`,
+          'Authorization': `Bearer ${config.HA_TOKEN}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(data)
@@ -697,7 +767,7 @@
 
     function toggleLock() {
       if (currentState === 'on') {
-        callService('switch.turn_off', { entity_id: ENTITY_ID });
+        callService('switch.turn_off', { entity_id: 'switch.tasmota' });
       } else if (currentState === 'off') {
         // When manually locking, clear any active timer
         if (timerInterval) {
@@ -705,7 +775,7 @@
           timerInterval = null;
         }
         clearTimerState().then(() => {
-          callService('switch.turn_on', { entity_id: ENTITY_ID });
+          callService('switch.turn_on', { entity_id: 'switch.tasmota' });
         });
       }
     }
@@ -740,34 +810,13 @@
     }
 
     function unlockForSeconds(seconds) {
-      console.log('Unlocking for', seconds, 'seconds');
-      const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + seconds * 1000);
-      console.log('Start time:', startTime.toISOString());
-      console.log('End time:', endTime.toISOString());
-      
-      callService('switch.turn_off', { entity_id: ENTITY_ID });
-      storeTimerState(startTime, seconds);
-      updateTimerDisplay({ startTime, duration: seconds, endTime });
-      
-      // Update display every second for smooth countdown
-      if (timerInterval) {
-        clearInterval(timerInterval);
+      if (!lockPerformed) {
+        alert('Please lock the door first before using this option.');
+        return;
       }
-      timerInterval = setInterval(() => {
-        const now = new Date();
-        const timeLeft = endTime.getTime() - now.getTime();
-        
-        if (timeLeft <= 0) {
-          console.log('Time to lock');
-          callService('switch.turn_on', { entity_id: ENTITY_ID });
-          clearInterval(timerInterval);
-          updateTimerDisplay(null);
-          clearTimerState();
-        } else {
-          updateTimerDisplay({ startTime, duration: seconds, endTime });
-        }
-      }, 1000); // Check every second for smooth countdown
+      callService('switch.turn_off', { entity_id: 'switch.tasmota' });
+      const endTime = new Date(Date.now() + seconds * 1000);
+      setTimer(endTime);
     }
 
     function formatTime(date) {
@@ -796,68 +845,26 @@
         alert('Please lock the door first before using this option.');
         return;
       }
-
-      fetch(`${HA_URL}/api/states/sun.sun`, {
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      
+      fetch(`${config.HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
       })
         .then(res => res.json())
         .then(data => {
-          const now = new Date();
           const sunset = new Date(data.attributes.next_setting);
-          const sunrise = new Date(data.attributes.next_rising);
-          
-          console.log('Unlock until sunset debug:');
-          console.log('Current time:', now.toLocaleString());
-          console.log('Sunset time:', sunset.toLocaleString());
-          console.log('Sunrise time:', sunrise.toLocaleString());
-          console.log('Is after sunset?', now >= sunset);
-          console.log('Is before sunrise?', now < sunrise);
-          
-          // Check if it's nighttime
-          if (now >= sunset || now < sunrise) {
-            console.log('Nighttime detected - preventing unlock');
-            alert('This feature is only available during daylight hours.');
-            return;
-          }
-          
-          // Calculate seconds until sunset
-          const seconds = Math.max(0, Math.floor((sunset - now) / 1000));
-          console.log('Seconds until sunset:', seconds);
-          
-          if (seconds > 0) {
-            console.log('Unlocking door until sunset');
-            callService('switch.turn_off', { entity_id: ENTITY_ID });
-            storeTimerState(now, seconds);
-            updateTimerDisplay({ startTime: now, duration: seconds, endTime: sunset });
-            
-            // Set up timer to lock at sunset
-            if (timerInterval) {
-              clearInterval(timerInterval);
-            }
-            timerInterval = setInterval(() => {
-              const currentTime = new Date();
-              if (currentTime >= sunset) {
-                console.log('Sunset reached - locking door');
-                callService('switch.turn_on', { entity_id: ENTITY_ID });
-                clearInterval(timerInterval);
-                updateTimerDisplay(null);
-                clearTimerState();
-              } else {
-                updateTimerDisplay({ startTime: now, duration: seconds, endTime: sunset });
-              }
-            }, 1000);
-          }
+          callService('switch.turn_off', { entity_id: 'switch.tasmota' });
+          setTimer(sunset);
         })
         .catch(error => {
-          console.error('Error in unlockUntilSunset:', error);
-          alert('Error fetching sunset time!');
+          console.error('Error fetching sunset time:', error);
+          alert('Failed to fetch sunset time. Please try again.');
         });
     }
 
     function checkSunsetStatus(simulatedTime) {
       console.log('Checking sunset status...');
-      fetch(`${HA_URL}/api/states/sun.sun`, {
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      fetch(`${config.HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
       })
         .then(res => res.json())
         .then(data => {
@@ -897,8 +904,8 @@
 
     // Add a function to update sunset time display periodically
     function updateSunsetTime() {
-      fetch(`${HA_URL}/api/states/sun.sun`, {
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      fetch(`${config.HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
       })
         .then(res => res.json())
         .then(data => {
@@ -927,7 +934,7 @@
             const now = new Date();
             const timeLeft = timerState.endTime.getTime() - now.getTime();
             if (timeLeft <= 0) {
-              callService('switch.turn_on', { entity_id: ENTITY_ID });
+              callService('switch.turn_on', { entity_id: 'switch.tasmota' });
               clearInterval(timerInterval);
               updateTimerDisplay(null);
               clearTimerState();
@@ -955,8 +962,8 @@
       document.getElementById('currentDate').textContent = `${now.getDate()}-${now.getMonth() + 1}`;
 
       // Weather
-      fetch(`${HA_URL}/api/states/weather.forecast_home`, { 
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` } 
+      fetch(`${config.HA_URL}/api/states/weather.forecast_home`, { 
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` } 
       })
         .then(res => res.json())
         .then(data => {
@@ -966,8 +973,8 @@
         });
 
       // Sunset
-      fetch(`${HA_URL}/api/states/sun.sun`, {
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      fetch(`${config.HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
       })
         .then(res => res.json())
         .then(data => {
@@ -978,8 +985,8 @@
         });
 
       // Brandweer notification
-      fetch(`${HA_URL}/api/states/sensor.friesland`, { 
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` } 
+      fetch(`${config.HA_URL}/api/states/sensor.friesland`, { 
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` } 
       })
         .then(res => res.json())
         .then(data => {
@@ -987,8 +994,8 @@
         });
 
       // Garbage container info
-      fetch(`${HA_URL}/api/states/sensor.omrin_tomorrow`, { 
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` } 
+      fetch(`${config.HA_URL}/api/states/sensor.omrin_tomorrow`, { 
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` } 
       })
         .then(res => res.json())
         .then(data => {
@@ -1002,6 +1009,35 @@
             garbageInfo.style.display = 'none';
           }
         });
+
+      // Daily code - check if YAML has been updated
+      fetch(`${config.HA_URL}/api/states/input_text.daily_code`, { 
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` } 
+      })
+        .then(res => {
+          if (!res.ok) {
+            // If the entity doesn't exist, disable the code input
+            const codeInput = document.getElementById('dailyCode');
+            if (codeInput) {
+              codeInput.disabled = true;
+              codeInput.placeholder = 'YAML update required';
+              codeInput.style.opacity = '0.5';
+            }
+            throw new Error('Daily code entity not found');
+          }
+          return res.json();
+        })
+        .then(data => {
+          const codeInput = document.getElementById('dailyCode');
+          if (codeInput) {
+            codeInput.disabled = false;
+            codeInput.placeholder = 'Enter daily code';
+            codeInput.style.opacity = '1';
+          }
+        })
+        .catch(error => {
+          console.error('Error checking daily code:', error);
+        });
     }
 
     function updateBrandweerNotifications(data) {
@@ -1014,8 +1050,8 @@
       const endTimeStr = endTime.toISOString();
       
       // Fetch history for the last 24 hours
-      fetch(`${HA_URL}/api/history/period/${startTimeStr}?filter_entity_id=${data.entity_id}&end_time=${endTimeStr}`, {
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      fetch(`${config.HA_URL}/api/history/period/${startTimeStr}?filter_entity_id=${data.entity_id}&end_time=${endTimeStr}`, {
+        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
       })
         .then(res => res.json())
         .then(response => {

@@ -1,0 +1,195 @@
+# Advanced Wiegand Access Control System
+# Version 1.0.1
+
+# Core Switch Configuration
+switch:
+  - platform: mqtt
+    name: "Magnetic Lock"
+    state_topic: "stat/tasmota/POWER"
+    command_topic: "cmnd/tasmota/POWER"
+    payload_on: "ON"
+    payload_off: "OFF"
+    state_on: "ON"
+    state_off: "OFF"
+    optimistic: false
+    qos: 1
+    retain: false
+
+# Weather Configuration
+weather:
+  forecast_home:
+    platform: template
+    name: "Weather Forecast"
+    temperature_template: "{{ states('sensor.weather_temperature') }}"
+    condition_template: "{{ states('sensor.weather_condition') }}"
+
+# Sun Configuration
+sun:
+  sun:
+    name: "Sun"
+    elevation: 0
+    azimuth: 0
+
+# Brandweer Notifications
+sensor:
+  friesland:
+    name: "Brandweer Friesland"
+    state_class: measurement
+    device_class: timestamp
+
+# Garbage Collection
+sensor:
+  omrin_tomorrow:
+    name: "Tomorrow's Garbage"
+    state_class: measurement
+
+# Input Text Configuration
+input_text:
+  daily_code:
+    name: "Daily Access Code"
+    max: 6
+    min: 6
+    pattern: "[0-9]*"
+    mode: text
+    initial: "123456"
+
+  allowed_codes:
+    name: "Allowed Codes"
+    initial: "123456,654321,112233"
+
+  version:
+    name: "System Version"
+    max: 10
+    min: 1
+    mode: text
+    initial: "1.0.1"
+
+# Input Number Configuration
+input_number:
+  max_attempts:
+    name: "Max Access Attempts"
+    min: 1
+    max: 10
+    step: 1
+    mode: box
+    icon: mdi:counter
+
+  lockout_duration:
+    name: "Lockout Duration"
+    min: 60
+    max: 3600
+    step: 60
+    mode: box
+    unit_of_measurement: seconds
+    icon: mdi:timer
+
+  unlock_time:
+    name: "Lock Unlock Time"
+    min: 0
+    max: 1440  # 24 hours in minutes
+    step: 1
+    mode: box
+
+# Input Datetime Configuration
+input_datetime:
+  lock_unlock_end:
+    name: "Lock Unlock End"
+    has_date: true
+    has_time: true
+    initial: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+# Input Boolean Configuration
+input_boolean:
+  daily_code_enabled:
+    name: "Daily Code Enabled"
+    icon: mdi:lock
+
+# Input Select Configuration
+input_select:
+  access_mode:
+    name: "Access Mode"
+    options:
+      - "Normal"
+      - "Extended"
+      - "Restricted"
+    icon: mdi:clock-time-four
+
+# Automation Configuration
+automation:
+  - id: "initialize_lock_timer"
+    alias: "Initialize Lock Timer"
+    description: "Initialize the lock timer on startup"
+    trigger:
+      - platform: homeassistant
+        event: start
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lock_unlock_end
+        data:
+          datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+  - id: "unlock_on_valid_code"
+    alias: "Unlock on Valid Code"
+    description: "Unlocks the door when a valid code is received"
+    trigger:
+      - platform: mqtt
+        topic: "keylock/access_code"
+    condition:
+      - condition: template
+        value_template: "{{ trigger.payload in states('input_text.allowed_codes').split(',') }}"
+      - condition: state
+        entity_id: switch.tasmota
+        state: "on"
+    action:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.tasmota
+      - delay: "00:00:10"  # Unlock duration
+      - service: switch.turn_on
+        target:
+          entity_id: switch.tasmota
+
+  - id: "reset_daily_code"
+    alias: "Reset Daily Code at Midnight"
+    description: "Resets the daily access code at midnight"
+    trigger:
+      - platform: time
+        at: "00:00:00"
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.daily_code
+        data:
+          value: "{{ states('input_text.daily_code') }}"
+
+# Script Configuration
+script:
+  unlock_for_duration:
+    alias: "Unlock for Duration"
+    sequence:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.tasmota
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lock_unlock_end
+        data:
+          datetime: "{{ now() + timedelta(seconds=seconds) }}"
+
+  unlock_until_sunset:
+    alias: "Unlock until Sunset"
+    sequence:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.tasmota
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lock_unlock_end
+        data:
+          datetime: "{{ states('sun.sun').attributes.next_setting }}"
+
+# Notification Configuration
+notify:
+  - platform: homeassistant
+    name: "Access Control Notifications"

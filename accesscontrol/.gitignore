@@ -1,0 +1,27 @@
+# Ignore secrets and configuration files
+secrets.yaml
+config.local.js
+config.js
+*.local.yaml
+
+# Ignore any local configuration files
+*.local.yaml
+
+# Ignore backup files
+*.bak
+*.backup
+
+# Ignore log files
+*.log
+
+# Ignore entity dumps
+entities.json
+entity_explorer.html
+
+# Ignore any files with tokens or credentials
+*credentials*
+*token*
+*secret*
+*password*
+*key*
+*auth* 
