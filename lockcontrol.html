@@ -578,7 +578,6 @@
           console.log('Start time (raw):', data.state);
           console.log('Start time (parsed):', startTime.toString());
           console.log('Current time:', now.toString());
-          console.log('Time difference (ms):', now.getTime() - startTime.getTime());
           
           // Validate the start time
           if (isNaN(startTime.getTime())) {
@@ -592,33 +591,22 @@
             return clearTimerState().then(() => null);
           }
           
-          // If start time is too old (more than 1 hour), clear it
-          if (now.getTime() - startTime.getTime() > 3600000) {
-            console.log('Start time is too old, clearing state');
-            return clearTimerState().then(() => null);
-          }
-          
-          const duration = 1800; // Fixed duration for 30 minutes
-          const endTime = new Date(startTime.getTime() + duration * 1000);
-          const timeLeft = endTime.getTime() - now.getTime();
-          
-          console.log('Timer state details:');
-          console.log('Start time (ISO):', startTime.toISOString());
-          console.log('Start time (local):', startTime.toString());
-          console.log('End time (ISO):', endTime.toISOString());
-          console.log('End time (local):', endTime.toString());
-          console.log('Current time (ISO):', now.toISOString());
-          console.log('Current time (local):', now.toString());
-          console.log('Time left:', timeLeft / 1000, 'seconds');
-          
-          if (timeLeft > 0) {
-            return { startTime, duration, endTime };
-          } else {
-            console.log('Timer has expired, clearing state');
-            return clearTimerState().then(() => null);
-          }
-        } else {
-          console.log('No valid state from Home Assistant');
+          // Calculate time until sunset
+          return fetch(`${HA_URL}/api/states/sun.sun`, {
+            headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+          })
+          .then(res => res.json())
+          .then(sunData => {
+            const sunset = new Date(sunData.attributes.next_setting);
+            const timeLeft = sunset.getTime() - now.getTime();
+            
+            if (timeLeft > 0) {
+              return { startTime, endTime: sunset };
+            } else {
+              console.log('Sunset has passed, clearing state');
+              return clearTimerState().then(() => null);
+            }
+          });
         }
         return null;
       })
@@ -801,38 +789,10 @@
       return now;
     }
 
-    // Function to check sunset status with given time
-    function checkSunsetStatus(simulatedTime) {
-      fetch(`${HA_URL}/api/states/sun.sun`, {
-        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
-      })
-        .then(res => res.json())
-        .then(data => {
-          const sunset = new Date(data.attributes.next_setting);
-          const sunrise = new Date(data.attributes.next_rising);
-          const sunsetBtn = document.getElementById('btnSunset');
-          const now = simulatedTime || new Date();
-          
-          // If it's after sunset and before next sunrise, button should be disabled
-          if (now >= sunset || now < sunrise) {
-            sunsetBtn.style.backgroundColor = '#888';
-            sunsetBtn.style.cursor = 'not-allowed';
-            sunsetBtn.textContent = 'Not available at night';
-            sunsetBtn.disabled = true;
-          } 
-          // If it's after sunrise and before sunset, button should be enabled
-          else {
-            sunsetBtn.style.backgroundColor = '';
-            sunsetBtn.style.cursor = '';
-            sunsetBtn.textContent = `Unlock until ${formatTime(sunset)}`;
-            sunsetBtn.disabled = false;
-          }
-        });
-    }
-
-    // Update unlockUntilSunset to use the new checkSunsetStatus function
     function unlockUntilSunset() {
+      console.log('Attempting to unlock until sunset...');
       if (!lockPerformed) {
+        console.log('Lock not performed yet - showing alert');
         alert('Please lock the door first before using this option.');
         return;
       }
@@ -846,15 +806,26 @@
           const sunset = new Date(data.attributes.next_setting);
           const sunrise = new Date(data.attributes.next_rising);
           
+          console.log('Unlock until sunset debug:');
+          console.log('Current time:', now.toLocaleString());
+          console.log('Sunset time:', sunset.toLocaleString());
+          console.log('Sunrise time:', sunrise.toLocaleString());
+          console.log('Is after sunset?', now >= sunset);
+          console.log('Is before sunrise?', now < sunrise);
+          
           // Check if it's nighttime
           if (now >= sunset || now < sunrise) {
+            console.log('Nighttime detected - preventing unlock');
             alert('This feature is only available during daylight hours.');
             return;
           }
           
           // Calculate seconds until sunset
           const seconds = Math.max(0, Math.floor((sunset - now) / 1000));
+          console.log('Seconds until sunset:', seconds);
+          
           if (seconds > 0) {
+            console.log('Unlocking door until sunset');
             callService('switch.turn_off', { entity_id: ENTITY_ID });
             storeTimerState(now, seconds);
             updateTimerDisplay({ startTime: now, duration: seconds, endTime: sunset });
@@ -866,6 +837,7 @@
             timerInterval = setInterval(() => {
               const currentTime = new Date();
               if (currentTime >= sunset) {
+                console.log('Sunset reached - locking door');
                 callService('switch.turn_on', { entity_id: ENTITY_ID });
                 clearInterval(timerInterval);
                 updateTimerDisplay(null);
@@ -877,8 +849,49 @@
           }
         })
         .catch(error => {
-          console.error('Error fetching sunset time:', error);
+          console.error('Error in unlockUntilSunset:', error);
           alert('Error fetching sunset time!');
+        });
+    }
+
+    function checkSunsetStatus(simulatedTime) {
+      console.log('Checking sunset status...');
+      fetch(`${HA_URL}/api/states/sun.sun`, {
+        headers: { 'Authorization': `Bearer ${HA_TOKEN}` }
+      })
+        .then(res => res.json())
+        .then(data => {
+          const sunset = new Date(data.attributes.next_setting);
+          const sunrise = new Date(data.attributes.next_rising);
+          const sunsetBtn = document.getElementById('btnSunset');
+          const now = simulatedTime || new Date();
+          
+          console.log('Time debug:');
+          console.log('Current time:', now.toLocaleString());
+          console.log('Sunset time:', sunset.toLocaleString());
+          console.log('Sunrise time:', sunrise.toLocaleString());
+          console.log('Is after sunset?', now >= sunset);
+          console.log('Is before sunrise?', now < sunrise);
+          
+          // If it's after sunset and before next sunrise, button should be disabled
+          if (now >= sunset || now < sunrise) {
+            console.log('Nighttime detected - disabling button');
+            sunsetBtn.style.backgroundColor = '#888';
+            sunsetBtn.style.cursor = 'not-allowed';
+            sunsetBtn.textContent = 'Not available at night';
+            sunsetBtn.disabled = true;
+          } 
+          // If it's after sunrise and before sunset, button should be enabled
+          else {
+            console.log('Daytime detected - enabling button');
+            sunsetBtn.style.backgroundColor = '';
+            sunsetBtn.style.cursor = '';
+            sunsetBtn.textContent = `Unlock until ${formatTime(sunset)}`;
+            sunsetBtn.disabled = false;
+          }
+        })
+        .catch(error => {
+          console.error('Error in checkSunsetStatus:', error);
         });
     }
 
