@@ -383,11 +383,11 @@
       <span class="material-icons">delete</span>
       <span id="garbageContainerInfo">--</span>
     </div>
-    <!-- Add version number -->
-    <div class="version-info" style="text-align: center; margin-top: 10px; font-size: 0.8em; color: #888; opacity: 0.5;">
+    <!-- Add version info -->
+    <div id="versionInfo" class="version-info" style="text-align: center; margin-top: 10px; font-size: 0.8em; color: #888; opacity: 0.5;">
       <span class="material-icons" style="font-size: 0.9em; vertical-align: middle;">info</span>
       <span id="versionNumber">v2.0.0</span>
-      <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800;">(YAML update required)</span>
+      <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800; display: none;">(YAML update required)</span>
     </div>
   </div>
 
@@ -415,7 +415,10 @@
     };
 
     // Update version number on load
-    document.getElementById('versionNumber').textContent = `v${config.VERSION}`;
+    const versionNumber = document.getElementById('versionNumber');
+    if (versionNumber) {
+        versionNumber.textContent = `v${config.VERSION}`;
+    }
 
     // Error handling and user feedback
     function showError(message, duration = 5000) {
@@ -439,32 +442,47 @@
         if (statusElement) {
             statusElement.textContent = message;
             statusElement.style.color = success ? '#4caf50' : '#f44336';
+            statusElement.style.display = 'inline';
         }
     }
 
     // Check if YAML has been updated
     async function checkYamlVersion() {
         try {
+            const versionStatus = document.getElementById('versionStatus');
+            const versionInfo = document.getElementById('versionInfo');
+            
+            if (!versionStatus || !versionInfo) {
+                console.warn('Version check elements not found');
+                return;
+            }
+
             const response = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.version}`, {
                 headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
             });
+            
             if (!response.ok) {
-                document.getElementById('versionStatus').style.display = 'inline';
-                document.querySelector('.version-info').style.opacity = '0.5';
+                versionStatus.style.display = 'inline';
+                versionInfo.style.opacity = '0.5';
                 return;
             }
+            
             const data = await response.json();
             if (data.state === config.VERSION) {
-                document.getElementById('versionStatus').style.display = 'none';
-                document.querySelector('.version-info').style.opacity = '1';
+                versionStatus.style.display = 'none';
+                versionInfo.style.opacity = '1';
             } else {
-                document.getElementById('versionStatus').style.display = 'inline';
-                document.querySelector('.version-info').style.opacity = '0.5';
+                versionStatus.style.display = 'inline';
+                versionInfo.style.opacity = '0.5';
             }
         } catch (error) {
             console.error('Error checking YAML version:', error);
-            document.getElementById('versionStatus').style.display = 'inline';
-            document.querySelector('.version-info').style.opacity = '0.5';
+            const versionStatus = document.getElementById('versionStatus');
+            const versionInfo = document.getElementById('versionInfo');
+            if (versionStatus && versionInfo) {
+                versionStatus.style.display = 'inline';
+                versionInfo.style.opacity = '0.5';
+            }
         }
     }
 
@@ -664,18 +682,25 @@
             if (!isAuthenticated) {
                 throw new Error('Authentication failed');
             }
+            
             // Initialize the rest of your application
-            getLockState(false);
+            const state = await getLockState(false);
+            
+            // Set up polling interval
             setInterval(() => {
-                getLockState(true);
-                if (currentState !== 'on') {
-                    initializeTimer();
-                }
+                getLockState(true).catch(error => {
+                    console.error('Background poll error:', error);
+                });
             }, 60000);
 
             updateSunsetTime();
             setInterval(updateSunsetTime, 3600000);
-            initializeTimer();
+            
+            // Initialize timer if unlocked
+            if (state === 'off') {
+                initializeTimer();
+            }
+            
             updateInfoBar();
             setInterval(updateInfoBar, 60000);
             
@@ -830,7 +855,7 @@
       
       console.log('Fetching lock state from:', config.tasmotaSwitch);
       
-      fetch(`${config.HA_URL}/api/states/${config.tasmotaSwitch}`, {
+      return fetch(`${config.HA_URL}/api/states/${config.tasmotaSwitch}`, {
         headers: { 
           'Authorization': `Bearer ${config.HA_TOKEN}`,
           'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -855,6 +880,7 @@
         if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
           console.log('Mobile: Lock state updated successfully:', currentState);
         }
+        return currentState;
       })
       .catch(error => {
         console.error('Error fetching lock state:', error);
@@ -869,13 +895,14 @@
           showTokenStatus(false, 'Failed to fetch lock state: ' + error.message);
           console.error('Mobile: Lock state fetch failed:', error);
         }
+        throw error;
       });
     }
 
     function getStoredTimerState() {
       console.log('Getting stored timer state');
       console.log('Current device timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
-      console.log('Device ID:', navigator.userAgent); // Log device info
+      console.log('Device ID:', navigator.userAgent);
       
       return fetch(`${config.HA_URL}/api/states/input_datetime.lock_unlock_end`, {
         method: 'GET',
@@ -894,23 +921,15 @@
         console.log('Raw timer state from Home Assistant:', data);
         console.log('Last updated by:', data.attributes.last_updated_by || 'unknown');
         console.log('Last changed:', data.last_changed);
+        
         if (data && data.state && data.state !== 'unknown') {
           // Parse the datetime string from Home Assistant
           const [datePart, timePart] = data.state.split(' ');
           const [year, month, day] = datePart.split('-').map(Number);
           const [hours, minutes, seconds] = timePart.split(':').map(Number);
           
-          // Create a date object with the current year
-          const now = new Date();
-          const currentYear = now.getFullYear();
-          
-          // If the year is not current or in the past, clear the state
-          if (year !== currentYear) {
-            console.log(`Invalid year ${year}, expected ${currentYear}, clearing state`);
-            return clearTimerState().then(() => null);
-          }
-          
-          const startTime = new Date(
+          // Create a date object
+          const endTime = new Date(
             year,
             month - 1, // JavaScript months are 0-based
             day,
@@ -919,40 +938,35 @@
             seconds
           );
           
+          const now = new Date();
+          
           // Debug time values
           console.log('Time values:');
-          console.log('Start time (raw):', data.state);
-          console.log('Start time (parsed):', startTime.toString());
+          console.log('End time (raw):', data.state);
+          console.log('End time (parsed):', endTime.toString());
           console.log('Current time:', now.toString());
           
-          // Validate the start time
-          if (isNaN(startTime.getTime())) {
-            console.log('Invalid start time, clearing state');
+          // Validate the end time
+          if (isNaN(endTime.getTime())) {
+            console.log('Invalid end time, clearing state');
             return clearTimerState().then(() => null);
           }
           
-          // If start time is in the future, something is wrong
-          if (startTime > now) {
-            console.log('Start time is in the future, clearing invalid state');
+          // If end time is more than 24 hours in the future, something is wrong
+          const maxFutureTime = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+          if (endTime > maxFutureTime) {
+            console.log('End time is too far in the future, clearing invalid state');
             return clearTimerState().then(() => null);
           }
           
-          // Calculate time until sunset
-          return fetch(`${config.HA_URL}/api/states/sun.sun`, {
-            headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
-          })
-          .then(res => res.json())
-          .then(sunData => {
-            const sunset = new Date(sunData.attributes.next_setting);
-            const timeLeft = sunset.getTime() - now.getTime();
-            
-            if (timeLeft > 0) {
-              return { startTime, endTime: sunset };
-            } else {
-              console.log('Sunset has passed, clearing state');
-              return clearTimerState().then(() => null);
-            }
-          });
+          // If end time is in the past, clear the state
+          if (endTime <= now) {
+            console.log('End time is in the past, clearing expired state');
+            return clearTimerState().then(() => null);
+          }
+          
+          // Return valid timer state
+          return { endTime };
         }
         return null;
       })
@@ -965,16 +979,32 @@
     function storeTimerState(startTime, duration) {
       console.log('Storing timer state - Start:', startTime, 'Duration:', duration);
       console.log('Current device timezone:', Intl.DateTimeFormat().resolvedOptions().timeZone);
-      console.log('Device ID:', navigator.userAgent); // Log device info
+      console.log('Device ID:', navigator.userAgent);
       
-      // Format the current time in the format Home Assistant expects
+      // Calculate end time
+      const endTime = new Date(startTime.getTime() + (duration * 1000));
       const now = new Date();
-      const year = now.getFullYear(); // Use current year
-      const month = String(now.getMonth() + 1).padStart(2, '0');
-      const day = String(now.getDate()).padStart(2, '0');
-      const hours = String(now.getHours()).padStart(2, '0');
-      const minutes = String(now.getMinutes()).padStart(2, '0');
-      const seconds = String(now.getSeconds()).padStart(2, '0');
+      
+      // Validate end time
+      if (endTime <= now) {
+        console.log('End time is in the past, not storing state');
+        return Promise.reject(new Error('End time is in the past'));
+      }
+      
+      // If end time is more than 24 hours in the future, something is wrong
+      const maxFutureTime = new Date(now.getTime() + (24 * 60 * 60 * 1000));
+      if (endTime > maxFutureTime) {
+        console.log('End time is too far in the future, not storing state');
+        return Promise.reject(new Error('End time is too far in the future'));
+      }
+      
+      // Format the end time in the format Home Assistant expects
+      const year = endTime.getFullYear();
+      const month = String(endTime.getMonth() + 1).padStart(2, '0');
+      const day = String(endTime.getDate()).padStart(2, '0');
+      const hours = String(endTime.getHours()).padStart(2, '0');
+      const minutes = String(endTime.getMinutes()).padStart(2, '0');
+      const seconds = String(endTime.getSeconds()).padStart(2, '0');
       
       const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
       
@@ -998,10 +1028,10 @@
         return response.json();
       }).then(data => {
         console.log('Timer state stored successfully in Home Assistant:', data);
-        // Verify the stored state
-        return getStoredTimerState();
+        return { endTime };
       }).catch(error => {
         console.error('Failed to store timer state:', error);
+        throw error;
       });
     }
 
@@ -1033,7 +1063,7 @@
         toggleBtn.classList.add('unlocked');
         mainContainer.className = 'container unlocked';
         nounlocktimer = 0; // Unlock timer active when unlocked
-        // Only initialize timer if it was manually unlocked
+        // Initialize timer if it was manually unlocked
         if (lockPerformed) {
           initializeTimer();
         }
@@ -1100,9 +1130,40 @@
         alert('Please lock the door first before using this option.');
         return;
       }
-      callService('switch.turn_off', { entity_id: 'switch.tasmota' });
+      callService('switch.turn_off', { entity_id: config.tasmotaSwitch });
+      
+      // Clear any existing timer
+      if (timerInterval) {
+        clearInterval(timerInterval);
+        timerInterval = null;
+      }
+      
+      // Set the end time
       const endTime = new Date(Date.now() + seconds * 1000);
-      setTimer(endTime);
+      
+      // Store the timer state
+      storeTimerState(new Date(), seconds).then(() => {
+        // Start the countdown
+        timerInterval = setInterval(() => {
+          const now = new Date();
+          const timeLeft = endTime.getTime() - now.getTime();
+          
+          if (timeLeft <= 0) {
+            // Time's up, lock the door
+            callService('switch.turn_on', { entity_id: config.tasmotaSwitch });
+            clearInterval(timerInterval);
+            timerInterval = null;
+            updateTimerDisplay(null);
+            clearTimerState();
+          } else {
+            // Update the display
+            updateTimerDisplay({ endTime: endTime });
+          }
+        }, 1000);
+        
+        // Initial display update
+        updateTimerDisplay({ endTime: endTime });
+      });
     }
 
     // Format time in European format with explicit timezone
@@ -1150,15 +1211,44 @@
         alert('Please lock the door first before using this option.');
         return;
       }
-      
+
       fetch(`${config.HA_URL}/api/states/sun.sun`, {
         headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
       })
         .then(res => res.json())
         .then(data => {
           const sunset = new Date(data.attributes.next_setting);
-          callService('switch.turn_off', { entity_id: 'switch.tasmota' });
-          setTimer(sunset);
+          callService('switch.turn_off', { entity_id: config.tasmotaSwitch });
+          
+          // Clear any existing timer
+          if (timerInterval) {
+            clearInterval(timerInterval);
+            timerInterval = null;
+          }
+          
+          // Store the timer state
+          storeTimerState(new Date(), (sunset.getTime() - Date.now()) / 1000).then(() => {
+            // Start the countdown
+            timerInterval = setInterval(() => {
+              const now = new Date();
+              const timeLeft = sunset.getTime() - now.getTime();
+              
+              if (timeLeft <= 0) {
+                // Time's up, lock the door
+                callService('switch.turn_on', { entity_id: config.tasmotaSwitch });
+                clearInterval(timerInterval);
+                timerInterval = null;
+                updateTimerDisplay(null);
+                clearTimerState();
+              } else {
+                // Update the display
+                updateTimerDisplay({ endTime: sunset });
+              }
+            }, 1000);
+            
+            // Initial display update
+            updateTimerDisplay({ endTime: sunset });
+          });
         })
         .catch(error => {
           console.error('Error fetching sunset time:', error);
@@ -1225,50 +1315,72 @@
 
     // Check for existing timer when page loads
     function initializeTimer() {
-      try {
-        console.log('Initializing timer...');
-        // Only check timer if the lock is currently unlocked
-        if (currentState === 'off') {
-          getStoredTimerState().then(timerState => {
-            console.log('Initial timer check - state:', timerState);
+        try {
+            console.log('Initializing timer...');
+            // Only check timer if the lock is currently unlocked
+            if (currentState === 'off') {
+                getStoredTimerState().then(timerState => {
+                    console.log('Initial timer check - state:', timerState);
 
-            if (timerState) {
-              // Clear any existing interval
-              if (timerInterval) clearInterval(timerInterval);
+                    if (timerState) {
+                        // Clear any existing interval
+                        if (timerInterval) {
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                        }
 
-              // Start a new interval for smooth countdown
-              timerInterval = setInterval(() => {
-                const now = new Date();
-                const timeLeft = timerState.endTime.getTime() - now.getTime();
-                if (timeLeft <= 0) {
-                  callService('switch.turn_on', { entity_id: 'switch.tasmota' });
-                  clearInterval(timerInterval);
-                  updateTimerDisplay(null);
-                  clearTimerState();
-                } else {
-                  updateTimerDisplay(timerState);
-                }
-              }, 1000);
+                        // Start a new interval for smooth countdown
+                        timerInterval = setInterval(() => {
+                            const now = new Date();
+                            const timeLeft = timerState.endTime.getTime() - now.getTime();
+                            
+                            if (timeLeft <= 0) {
+                                // Time's up, lock the door
+                                callService('switch.turn_on', { entity_id: config.tasmotaSwitch });
+                                clearInterval(timerInterval);
+                                timerInterval = null;
+                                updateTimerDisplay(null);
+                                clearTimerState();
+                            } else {
+                                // Update the display
+                                updateTimerDisplay(timerState);
+                            }
+                        }, 1000);
 
-              updateTimerDisplay(timerState);
+                        // Initial display update
+                        updateTimerDisplay(timerState);
+                    } else {
+                        if (timerInterval) {
+                            clearInterval(timerInterval);
+                            timerInterval = null;
+                        }
+                        updateTimerDisplay(null);
+                    }
+                }).catch(error => {
+                    console.error('Error initializing timer:', error);
+                    if (timerInterval) {
+                        clearInterval(timerInterval);
+                        timerInterval = null;
+                    }
+                    updateTimerDisplay(null);
+                });
             } else {
-              if (timerInterval) clearInterval(timerInterval);
-              updateTimerDisplay(null);
+                // If lock is on, clear any existing timer
+                if (timerInterval) {
+                    clearInterval(timerInterval);
+                    timerInterval = null;
+                }
+                updateTimerDisplay(null);
+                clearTimerState();
             }
-          });
-        } else {
-          // If lock is on, clear any existing timer
-          if (timerInterval) {
-            clearInterval(timerInterval);
-            timerInterval = null;
-          }
-          updateTimerDisplay(null);
-          clearTimerState();
+        } catch (error) {
+            console.error('Error initializing timer:', error);
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+            updateTimerDisplay(null);
         }
-      } catch (error) {
-        console.error('Error initializing timer:', error);
-        getLockState(false);
-      }
     }
 
     // Add these new functions for the info bar
@@ -1308,6 +1420,9 @@
         .then(res => res.json())
         .then(data => {
           updateBrandweerNotifications(data);
+        })
+        .catch(error => {
+          console.error('Error fetching brandweer status:', error);
         });
 
       // Garbage container info
@@ -1329,63 +1444,75 @@
     }
 
     // Update brandweer notifications
-    async function updateBrandweerNotifications() {
+    async function updateBrandweerNotifications(data) {
         try {
-            const response = await fetch(`${config.HA_URL}/api/states/sensor.brandweer`, {
-                headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
-            });
-            
-            if (!response.ok) {
-                throw new Error(`Failed to get brandweer state: ${response.status}`);
+            // If no data provided, fetch it
+            if (!data) {
+                const response = await fetch(`${config.HA_URL}/api/states/sensor.friesland`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to get brandweer state: ${response.status}`);
+                }
+                
+                data = await response.json();
             }
             
-            const data = await response.json();
             const brandweerStatus = document.getElementById('brandweerStatus');
             const brandweerInfo = document.getElementById('brandweerInfo');
             const brandweerTimestamp = document.getElementById('brandweerTimestamp');
             
-            if (data.state === 'on') {
+            if (!brandweerStatus || !brandweerInfo || !brandweerTimestamp) {
+                console.warn('Brandweer elements not found');
+                return;
+            }
+
+            // Get the last 3 entries from the history
+            const now = new Date();
+            const startTime = new Date(now.getTime() - (24 * 60 * 60 * 1000)); // Last 24 hours
+            const historyResponse = await fetch(`${config.HA_URL}/api/history/period/${startTime.toISOString()}?filter_entity_id=sensor.friesland`, {
+                headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+            });
+
+            if (!historyResponse.ok) {
+                throw new Error(`Failed to get history: ${historyResponse.status}`);
+            }
+
+            const historyData = await historyResponse.json();
+            const historyEntries = historyData[0] || [];
+            const timestamp = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
+            
+            // Update display
+            if (historyEntries.length > 0) {
                 brandweerStatus.textContent = 'Brandweer Active';
                 brandweerStatus.className = 'status warning';
-                
-                // Add to history if it's a new message
-                const message = data.attributes.message || 'Brandweer alert';
-                const timestamp = new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' });
-                
-                // Check if this is a new message
-                if (!brandweerHistory.length || brandweerHistory[0].message !== message) {
-                    brandweerHistory.unshift({ message, timestamp });
-                    // Keep only last 3 messages
-                    if (brandweerHistory.length > 3) {
-                        brandweerHistory.pop();
-                    }
-                }
-                
-                // Update display
-                brandweerInfo.textContent = brandweerHistory[0].message;
-                brandweerTimestamp.innerHTML = `<span class="material-icons">update</span> ${brandweerHistory[0].timestamp}`;
+                brandweerInfo.textContent = historyEntries[0].state || 'Brandweer alert';
+                brandweerTimestamp.innerHTML = `<span class="material-icons">update</span> ${timestamp}`;
                 
                 // Show history in notifications
                 const notificationsContainer = document.getElementById('brandweerNotifications');
-                notificationsContainer.innerHTML = `
-                    <div id="brandweerStatus" class="status warning">Brandweer Active</div>
-                    ${brandweerHistory.map(entry => `
-                        <div class="brandweer-entry">
-                            <span class="material-icons">warning</span>
-                            <div class="brandweer-content">
-                                <div>${entry.message}</div>
-                                <div class="brandweer-time">${entry.timestamp}</div>
+                if (notificationsContainer) {
+                    notificationsContainer.innerHTML = `
+                        <div id="brandweerStatus" class="status warning">Brandweer Active</div>
+                        ${historyEntries.slice(0, 3).map(entry => `
+                            <div class="brandweer-entry">
+                                <span class="material-icons">warning</span>
+                                <div class="brandweer-content">
+                                    <div>${entry.state || 'Brandweer alert'}</div>
+                                    <div class="brandweer-time">${new Date(entry.last_updated).toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}</div>
+                                </div>
                             </div>
-                        </div>
-                    `).join('')}
-                `;
+                        `).join('')}
+                    `;
+                }
                 
                 showError('Brandweer sensor is active!');
             } else {
                 brandweerStatus.textContent = 'Brandweer Inactive';
                 brandweerStatus.className = 'status success';
                 brandweerInfo.textContent = 'No active alerts';
-                brandweerTimestamp.innerHTML = `<span class="material-icons">update</span> ${new Date().toLocaleTimeString('nl-NL', { hour: '2-digit', minute: '2-digit' })}`;
+                brandweerTimestamp.innerHTML = `<span class="material-icons">update</span> ${timestamp}`;
             }
         } catch (error) {
             console.error('Error updating brandweer status:', error);
