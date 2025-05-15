@@ -185,4 +185,4 @@ For local development and testing:
 
 ## License
 
-MIT License 
+GPL
