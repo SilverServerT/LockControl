@@ -12,6 +12,8 @@ A modern, mobile-friendly interface for controlling magnetic locks with Home Ass
 - Brandweer (Fire Department) notifications
 - Garbage collection schedule display
 - Version checking and YAML update notifications
+- Debug tools for state management
+- Clear separation of immediate and timed lock control
 
 ## Mobile Support
 
@@ -21,6 +23,7 @@ The interface is fully optimized for mobile devices with:
 - Mobile-specific optimizations
 - Debug panel for troubleshooting (🔍 button in bottom right)
 - Cache management tools
+- State management debugging
 
 ## Installation
 
@@ -59,14 +62,17 @@ input_datetime:
 const config = {
     HA_TOKEN: 'your_long_lived_access_token',
     HA_URL: 'https://your-home-assistant-url',
-    VERSION: '2.0.0'
+    VERSION: '2.1.0'
 };
 ```
 
 ## Usage
 
 1. Access the interface through your Home Assistant instance at `/local/lockcontrol/lockcontrol.html`
-2. Use the interface to control your magnetic lock
+2. Use the interface to control your magnetic lock:
+   - Main toggle button for immediate lock/unlock
+   - Duration buttons for timed unlocks
+   - Debug button to clear all states if needed
 3. For mobile devices, use the debug panel (🔍) if you encounter any issues
 
 ## Troubleshooting
@@ -75,6 +81,11 @@ const config = {
 1. Click the 🔍 debug button in the bottom right
 2. Check the debug panel for error messages
 3. Use the "Clear Cache & Reload" button if needed
+
+### Lock State Issues
+1. Use the "Clear All States" debug button to reset all states
+2. Verify the lock state in Home Assistant
+3. Check the debug panel for state transition errors
 
 ### Configuration Issues
 1. Verify your `config.js` file is in the correct location

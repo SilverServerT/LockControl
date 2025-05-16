@@ -2,6 +2,25 @@
 
 All notable changes to the Lock Control Interface will be documented in this file.
 
+## [2.1.0] - 2024-03-20
+
+### Added
+- Debug button to clear all states
+- Improved state management for magnetic lock
+- Enhanced timer handling system
+
+### Fixed
+- Lock state persistence issues
+- Timer interference with manual lock/unlock
+- Countdown timer display issues
+- State transitions for magnetic lock (ON = locked, OFF = unlocked)
+
+### Changed
+- Separated immediate toggle from timed unlock functionality
+- Improved timer state management
+- Enhanced error handling for state transitions
+- Better UI feedback for lock operations
+
 ## [2.0.0] - 2024-03-19
 
 ### Added
