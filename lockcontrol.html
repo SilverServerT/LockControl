@@ -812,12 +812,18 @@
                     await callService('switch', 'turn_off', config.tasmotaSwitch);
                     currentState = 'off';
                 } else if (currentState === 'off') {
-                    // When manually locking, clear any active timer
+                    // Clear any active countdown when manually locking
                     if (timerInterval) {
                         clearInterval(timerInterval);
                         timerInterval = null;
                     }
-                    await clearTimerState();
+                    // Reset the unlock end time
+                    await callService('input_datetime', 'set_datetime', config.stateEntities.unlockEnd, {
+                        datetime: "1970-01-01T00:00:00"
+                    });
+                    // Hide the countdown display
+                    document.getElementById('countdownTimer').style.display = 'none';
+                    
                     await callService('switch', 'turn_on', config.tasmotaSwitch);
                     currentState = 'on';
                 }
@@ -864,7 +870,7 @@
                 console.log('Time until sunset:', Math.floor((sunset - now) / 1000 / 60), 'minutes');
                 
                 // Unlock the door
-                await callService('switch.turn_off', { entity_id: config.tasmotaSwitch });
+                await callService('switch', 'turn_off', config.tasmotaSwitch);
                 currentState = 'off';
                 updateLockStatus();
                 
@@ -875,8 +881,7 @@
                 }
                 
                 // Set the unlock end time to sunset
-                await callService('input_datetime.set_datetime', {
-                    entity_id: config.stateEntities.unlockEnd,
+                await callService('input_datetime', 'set_datetime', config.stateEntities.unlockEnd, {
                     datetime: sunset.toISOString()
                 });
                 
@@ -892,7 +897,7 @@
                     
                     if (timeLeft <= 0) {
                         console.log('Timer expired - locking door');
-                        callService('switch.turn_on', { entity_id: config.tasmotaSwitch });
+                        callService('switch', 'turn_on', config.tasmotaSwitch);
                         clearInterval(timerInterval);
                         timerInterval = null;
                         updateTimerDisplay(null);
@@ -1117,7 +1122,7 @@
                 showLoading(true);
                 
                 // First unlock the door
-                await callService('switch.turn_off', { entity_id: config.tasmotaSwitch });
+                await callService('switch', 'turn_off', config.tasmotaSwitch);
                 currentState = 'off';
                 updateLockStatus();
 
@@ -1132,8 +1137,7 @@
                 
                 const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${secs}`;
                 
-                await callService('input_datetime.set_datetime', {
-                    entity_id: config.stateEntities.unlockEnd,
+                await callService('input_datetime', 'set_datetime', config.stateEntities.unlockEnd, {
                     datetime: formattedDate
                 });
 
@@ -1369,32 +1373,15 @@
                 }
                 
                 // Reset unlock end time in Home Assistant
-                await fetch(`${config.HA_URL}/api/services/input_datetime/set_datetime`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${config.HA_TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        entity_id: config.stateEntities.unlockEnd,
-                        datetime: "1970-01-01T00:00:00"
-                    })
+                await callService('input_datetime', 'set_datetime', config.stateEntities.unlockEnd, {
+                    datetime: "1970-01-01T00:00:00"
                 });
                 
                 // Hide countdown timer
                 document.getElementById('countdownTimer').style.display = 'none';
                 
                 // Force lock the door
-                await fetch(`${config.HA_URL}/api/services/switch/turn_on`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${config.HA_TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        entity_id: config.tasmotaSwitch
-                    })
-                });
+                await callService('switch', 'turn_on', config.tasmotaSwitch);
                 
                 // Update UI
                 currentState = 'on';
