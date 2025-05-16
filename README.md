@@ -1,108 +1,52 @@
-# Lock Control System
+# Lock Control System (Experimental)
 
-A secure and flexible door access control system integrated with Home Assistant.
+⚠️ **EXPERIMENTAL CODE - USE AT YOUR OWN RISK** ⚠️
 
-## Overview
+This is an experimental project exploring secure door access control using Home Assistant. The code is provided as-is with no guarantees of functionality or security. This is a work in progress and should not be used in production environments.
 
-The Lock Control System is a comprehensive door access management solution designed for Home Assistant environments. It provides a secure and user-friendly interface for managing door access through various authentication methods while maintaining detailed logs and security controls.
+## Project Goals
 
-### Purpose
-This system is designed for:
-- Managing secure access to buildings or rooms
-- Providing temporary access through daily and one-time codes
-- Monitoring door status and access attempts
-- Integrating with Home Assistant for automation and control
-- Supporting emergency services access (Brandweer/Fire Department)
+I'm working towards creating a secure, flexible, and user-friendly door access system that:
+- Provides secure access control through multiple methods
+- Integrates seamlessly with Home Assistant
+- Supports emergency services access
+- Implements proper security measures
+- Is easy to maintain and extend
 
-### How It Works
+## Current Status
 
-1. **Access Control**
-   - Daily codes are generated and automatically rotated
-   - One-time codes can be generated for temporary access
-   - Night mode protection automatically disables daily codes after sunset
-   - Magnetic lock control with configurable unlock durations
+This is an experimental implementation that includes:
+- Basic door control functionality
+- Daily and one-time code generation
+- Night mode protection
+- Weather and time information display
+- Emergency services status monitoring
+- Debug features for development
 
-2. **Security Features**
-   - Automatic code rotation and expiration
-   - Night mode protection
-   - Access logging and monitoring
-   - Door state verification
-   - Integration with Home Assistant security features
+## Features (Experimental)
 
-3. **Integration**
-   - Connects to Home Assistant for centralized control
-   - Uses Tasmota switches for lock control
-   - Integrates with weather and sun position data
-   - Supports emergency services status monitoring
-
-4. **User Interface**
-   - Mobile-friendly design
-   - Real-time status updates
-   - Weather and time information
-   - Emergency services status
-   - Debug controls for troubleshooting
-
-⚠️ **IMPORTANT: This is example code only** ⚠️
-
-This codebase contains debug logging and several unfinished features. It is provided as a reference implementation and should not be used in production without significant modifications.
-
-## Features
-
-- Magnetic lock control with status display
-- Daily code generation and display
-- One-time code generation and display
-- Automatic lock status updates
+- Magnetic lock control
+- Daily code system with night mode
+- One-time code generation
 - Weather information display
 - Sunset/sunrise time display
-- Brandweer (Fire Department) status display
-- Debug logging and state management
-- Version tracking and YAML update notifications
-- Daily code generation with night mode protection
-- One-time code support
-- Home Assistant integration
+- Emergency services status
+- Debug logging and controls
 - Mobile-friendly interface
-- Real-time status updates
-- Secure access control
 
-## Security
-The system includes several security features:
-- Night mode protection for daily codes
-- Code expiration and rotation
-- Access logging
-- Door state monitoring
+## Security Notice
 
-For a complete list of security features and planned improvements, see [TODO.md](TODO.md).
-
-## Debug Features
-
-- Extensive console logging for troubleshooting
-- State change tracking
-- Error reporting
-- Cache clearing functionality
-- Manual refresh capability
-
-## Unfinished Features
-
-- WebSocket implementation (currently using polling)
-- Some error handling scenarios
-- Complete state synchronization
-- Full mobile responsiveness
-- Complete documentation
+This is experimental code and has not undergone proper security auditing. Several security improvements are planned and documented in [TODO.md](TODO.md). Do not use this code in any environment where security is critical.
 
 ## Requirements
 
 - Home Assistant instance
 - Tasmota switch for lock control
-- Input text entities for codes
-- Input datetime entities for expiry times
-- Weather entity
-- Sun entity
-- Brandweer sensor
+- Various Home Assistant entities (see Configuration)
 
 ## Configuration
 
-The system requires several entities to be set up in Home Assistant:
-
+Required Home Assistant entities:
 - `input_text.lockcontrol_daily_code`
 - `input_datetime.lockcontrol_daily_code_expiry`
 - `input_text.lockcontrol_one_time_code`
@@ -113,43 +57,39 @@ The system requires several entities to be set up in Home Assistant:
 
 ## Installation
 
-1. Copy the files to your Home Assistant configuration directory
-2. Configure the required entities in Home Assistant
-3. Set up the necessary automations
-4. Configure the web interface
+1. Copy files to Home Assistant configuration directory
+2. Set up required entities
+3. Configure automations
+4. Test thoroughly in a safe environment
 
-## Usage
+## Debug Features
 
-The interface provides:
-- Lock status display
-- Daily code display
-- One-time code display
-- Weather information
-- Sunset/sunrise times
-- Brandweer status
-- Debug controls
-
-## Debug Mode
-
-The system includes extensive debug logging. Check the browser console for detailed information about:
-- State changes
-- API calls
-- Error conditions
-- Timing information
-- Configuration status
+- Console logging
+- State tracking
+- Error reporting
+- Cache controls
+- Manual refresh
 
 ## Known Issues
 
-- Some features may not work as expected
-- Error handling is incomplete
-- Mobile responsiveness needs improvement
-- State synchronization may have delays
-- Documentation is incomplete
+- Incomplete error handling
+- Limited mobile support
+- State synchronization delays
+- Incomplete documentation
+- Security vulnerabilities (see TODO.md)
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+This is experimental code. Feel free to:
+- Test and report issues
+- Suggest improvements
+- Fork and experiment
+- Share your findings
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+
+## Disclaimer
+
+This software is provided "as is", without warranty of any kind. The author is not responsible for any damage or issues that may arise from using this code. Use at your own risk.
