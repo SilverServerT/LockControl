@@ -8,6 +8,25 @@
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
     <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@6.5.95/css/materialdesignicons.min.css">
+    <!-- Load version tracking script first -->
+    <script>
+        // Load version tracking script dynamically
+        const script = document.createElement('script');
+        script.src = window.location.origin + '/local/admin-dashboard/version_tracking.js';
+        script.onerror = () => {
+            console.error('Failed to load version tracking script from /local/admin-dashboard/version_tracking.js');
+            // Create a fallback version tracker
+            window.VersionTracker = class VersionTracker {
+                constructor(config) {
+                    console.warn('Using fallback version tracker');
+                }
+                async checkVersion() {
+                    console.warn('Version check not available');
+                }
+            };
+        };
+        document.head.appendChild(script);
+    </script>
     <style>
         :root {
             --primary: #1976d2;
@@ -19,6 +38,20 @@
             --shadow: 0 4px 24px rgba(0,0,0,0.08);
             --radius: 18px;
             --transition: 0.2s cubic-bezier(.4,0,.2,1);
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
         }
 
         html, body {
@@ -126,6 +159,12 @@
             letter-spacing: 2px;
             width: 100%;
             box-sizing: border-box;
+        }
+
+        .code-display.used {
+            text-decoration: line-through;
+            color: #666;
+            opacity: 0.7;
         }
 
         .expiry {
@@ -238,7 +277,11 @@
             min-height: 30px;
             font-family: monospace;
             letter-spacing: 2px;
-            transition: border-color 0.3s ease;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
         }
 
         .keypad-display.success {
@@ -247,6 +290,19 @@
 
         .keypad-display.error {
             border-color: var(--danger);
+        }
+
+        .keypad-display .lock-icon {
+            font-size: 1.2em;
+            transition: all 0.3s ease;
+        }
+
+        .keypad-display.success .lock-icon {
+            color: var(--accent);
+        }
+
+        .keypad-display.error .lock-icon {
+            color: var(--danger);
         }
 
         .keypad-grid {
@@ -467,7 +523,6 @@
     <div class="container">
         <div class="header">
             <h1>Advanced Access Control</h1>
-            <div class="version">v2.1.0</div>
         </div>
 
         <div class="grid">
@@ -482,9 +537,8 @@
             <!-- One-Time Code Card -->
             <div class="card">
                 <h2>One-Time Code</h2>
-                <div id="oneTimeCode" class="code-display">Generate Code</div>
+                <div id="oneTimeCode" class="code-display">Loading...</div>
                 <div id="oneTimeCodeExpiry" class="expiry"></div>
-                <button id="generateCode" class="button">Generate New Code</button>
                 <div id="oneTimeCodeStatus" class="status"></div>
             </div>
 
@@ -500,7 +554,10 @@
             <div class="card">
                 <h2>Keypad Control</h2>
                 <div class="keypad">
-                    <div id="keypadDisplay" class="keypad-display">Enter Code</div>
+                    <div id="keypadDisplay" class="keypad-display">
+                        <span class="material-icons lock-icon">lock</span>
+                        Enter Code
+                    </div>
                     <div class="keypad-grid">
                         <button onclick="simulateKeyPress('1')">1</button>
                         <button onclick="simulateKeyPress('2')">2</button>
@@ -515,10 +572,18 @@
                         <button onclick="simulateKeyPress('0')">0</button>
                         <button onclick="simulateKeyPress('E')">E</button>
                     </div>
-                    <button id="lockButton" class="button lock-button" onclick="toggleLock()">
-                        <span class="material-icons">lock</span>
-                        Lock Door
+                </div>
+            </div>
+
+            <!-- Add debug button after the one-time code card -->
+            <div class="card">
+                <h2>Debug Tools</h2>
+                <button id="debugOneTimeCode" class="button warning">Debug One-Time Code</button>
+                <div style="margin-top: 10px; position: relative;">
+                    <button id="copyDebug" class="button" style="position: absolute; right: 0; top: 0; padding: 5px 10px; font-size: 0.8em;">
+                        <span class="material-icons" style="font-size: 1em;">content_copy</span>
                     </button>
+                    <div id="debugOutput" class="status" style="margin-top: 10px; text-align: left; font-family: monospace; white-space: pre-wrap; background: #f5f5f5; padding: 10px; border-radius: 4px; user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; overflow-x: auto;"></div>
                 </div>
             </div>
         </div>
@@ -538,14 +603,12 @@
     </div>
 
     <!-- Add version info -->
-    <div id="versionInfo" class="version-info" style="text-align: center; margin-top: 10px; font-size: 0.8em; color: #888; opacity: 0.5;">
-      <span class="material-icons" style="font-size: 0.9em; vertical-align: middle;">info</span>
-      <span id="versionNumber">v2.1.0</span>
-      <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800; display: none;">(YAML update required)</span>
+    <div id="versionInfo" class="version-info" style="text-align: center; margin-top: 20px; padding: 10px; font-size: 0.8em; color: #888; opacity: 0.5; border-top: 1px solid rgba(0,0,0,0.1);">
+        <span id="versionNumber">v2.2.0</span>
+        <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800; display: none;">(YAML update required)</span>
     </div>
 
     <!-- Load configuration first -->
-    <script src="version_tracking.js"></script>
     <script>
         // Configuration object
         const config = {
@@ -564,7 +627,7 @@
                 dailyCodeExpiry: "input_datetime.lockcontrol_daily_code_expiry",
                 oneTimeCode: "input_text.lockcontrol_one_time_code",
                 oneTimeCodeExpiry: "input_datetime.lockcontrol_one_time_code_expiry",
-                version: "input_text.version_lockcontrolv2"
+                version: "input_text.version_lockcontrol"
             }
         };
 
@@ -597,6 +660,89 @@
         const confirmGenerate = document.getElementById('confirmGenerate');
         const codeExpiryInput = document.getElementById('codeExpiry');
 
+        // Add initialization state tracking
+        let isInitialized = false;
+        let initializationInProgress = false;
+
+        // Initialize the application
+        async function initializeApp() {
+            if (initializationInProgress) {
+                console.log('Initialization already in progress, waiting...');
+                return;
+            }
+            if (isInitialized) {
+                console.log('Already initialized');
+                return;
+            }
+
+            try {
+                initializationInProgress = true;
+                showLoading(true);
+                console.log('Starting initialization...');
+
+                // Initialize device-specific features
+                initDeviceSpecific();
+                
+                // Load configuration
+                console.log('Loading configuration...');
+                await loadConfig();
+                
+                // Initialize version tracker
+                console.log('Initializing version tracker...');
+                versionTracker = new VersionTracker(config);
+                
+                // Verify authentication
+                console.log('Verifying authentication...');
+                const isAuthenticated = await verifyAuth();
+                if (!isAuthenticated) {
+                    throw new Error('Authentication failed');
+                }
+                
+                // Load saved state
+                console.log('Loading saved state...');
+                await loadSavedState();
+                
+                // Set up intervals
+                console.log('Setting up intervals...');
+                setInterval(() => updateDailyCode(), 60000);
+                setInterval(checkLockout, 1000);
+                
+                // Check YAML version
+                console.log('Checking YAML version...');
+                await versionTracker.checkVersion();
+                
+                // Mark as initialized
+                isInitialized = true;
+                console.log('Initialization complete');
+                showSuccess('System initialized successfully');
+            } catch (error) {
+                console.error('Error initializing system:', error);
+                showError('Failed to initialize system: ' + error.message);
+                // Reset initialization state on error
+                isInitialized = false;
+            } finally {
+                initializationInProgress = false;
+                showLoading(false);
+            }
+        }
+
+        // Add retry mechanism for initialization
+        async function retryInitialization() {
+            if (!isInitialized && !initializationInProgress) {
+                console.log('Retrying initialization...');
+                await initializeApp();
+            }
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp().catch(error => {
+                console.error('Initial initialization failed:', error);
+                // Set up retry interval
+                setInterval(retryInitialization, 5000);
+            });
+        });
+
         // Format time in European format
         function formatTime(date) {
             return date.toLocaleTimeString('nl-NL', {
@@ -623,11 +769,13 @@
         // Simulate keypad press
         function simulateKeyPress(key) {
             const keypadDisplay = document.querySelector('.keypad-display');
+            const lockIcon = keypadDisplay.querySelector('.lock-icon');
             
             if (key === 'C') {
                 enteredCode = '';
                 keypadDisplay.textContent = 'Enter Code';
                 keypadDisplay.className = 'keypad-display';
+                lockIcon.textContent = 'lock';
             } else if (key === 'E') {
                 validateCode(enteredCode);
             } else {
@@ -691,16 +839,6 @@
             }
             loadingDiv.style.display = show ? 'flex' : 'none';
         }
-
-        // Add spinner animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        `;
-        document.head.appendChild(style);
 
         // Add a function to show token validation status
         function showTokenStatus(isValid, message) {
@@ -893,6 +1031,7 @@
         // Home Assistant API calls with error handling
         async function callHAService(domain, service, data) {
             try {
+                console.log(`Calling HA service ${domain}.${service} with data:`, data);
                 const response = await fetch(`${config.HA_URL}/api/services/${domain}/${service}`, {
                     method: 'POST',
                     headers: {
@@ -911,9 +1050,17 @@
                 }
                 
                 const result = await response.json().catch(() => ({}));
+                console.log(`Service call result for ${domain}.${service}:`, result);
+                
+                // For input_text.set_value, we need to wait a moment for the state to update
+                if (domain === 'input_text' && service === 'set_value') {
+                    console.log('Waiting for input_text state to update...');
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+                
                 return result;
             } catch (error) {
-                console.error('Error calling HA service:', error);
+                console.error(`Error calling HA service ${domain}.${service}:`, error);
                 showError(`Failed to call ${domain}.${service}: ${error.message}`);
                 throw error;
             }
@@ -921,6 +1068,7 @@
 
         async function getHAState(entityId) {
             try {
+                console.log(`Fetching state for ${entityId}...`);
                 const response = await fetch(`${config.HA_URL}/api/states/${entityId}`, {
                     headers: {
                         'Authorization': `Bearer ${config.HA_TOKEN}`
@@ -931,28 +1079,81 @@
                     if (response.status === 401) {
                         throw new Error('Authentication failed. Please check your token.');
                     }
+                    if (response.status === 404) {
+                        console.error(`Entity ${entityId} not found`);
+                        return '';
+                    }
                     const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
                     throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
                 }
                 
                 const data = await response.json();
+                console.log(`Raw response for ${entityId}:`, data);
+                
+                // For input_text entities, we need to check both state and attributes
+                if (entityId.startsWith('input_text.')) {
+                    const state = data.state;
+                    console.log(`State for ${entityId}:`, state);
+                    return state; // Return empty string if state is empty
+                }
+                
+                // For input_datetime entities, we need to format the datetime
+                if (entityId.startsWith('input_datetime.')) {
+                    const datetime = data.state;
+                    console.log(`Datetime for ${entityId}:`, datetime);
+                    return datetime; // Return empty string if datetime is empty
+                }
+                
                 return data.state;
             } catch (error) {
-                console.error('Error getting HA state:', error);
+                console.error(`Error getting HA state for ${entityId}:`, error);
                 showError(`Failed to get state for ${entityId}: ${error.message}`);
-                return null;
+                return ''; // Return empty string on error
             }
         }
 
         async function setHAState(entityId, state) {
             try {
+                console.log(`Setting HA state for ${entityId} to:`, state);
+                
+                // First, try to get the current state to verify the entity exists
+                const currentState = await getHAState(entityId);
+                console.log(`Current state for ${entityId}:`, currentState);
+                
+                // Use the correct service call format for input_text
                 const result = await callHAService('input_text', 'set_value', {
                     entity_id: entityId,
-                    value: state
+                    value: state.toString() // Ensure value is a string
                 });
+                console.log(`Service call result:`, result);
+                
+                // Wait for state to update
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Verify the state was set correctly
+                const verifyState = await getHAState(entityId);
+                console.log(`Verification - State for ${entityId} after setting:`, verifyState);
+                
+                if (verifyState !== state.toString()) {
+                    console.warn(`State mismatch for ${entityId}. Expected: ${state}, Got: ${verifyState}`);
+                    // Try setting the state again if it didn't take
+                    console.log('Retrying state set...');
+                    await callHAService('input_text', 'set_value', {
+                        entity_id: entityId,
+                        value: state.toString()
+                    });
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    const retryState = await getHAState(entityId);
+                    console.log(`Retry verification - State for ${entityId}:`, retryState);
+                    
+                    if (retryState !== state.toString()) {
+                        throw new Error(`Failed to set state after retry. Expected: ${state}, Got: ${retryState}`);
+                    }
+                }
+                
                 return result;
             } catch (error) {
-                console.error('Error setting HA state:', error);
+                console.error(`Error setting HA state for ${entityId}:`, error);
                 showError(`Failed to set state for ${entityId}: ${error.message}`);
                 throw error;
             }
@@ -960,13 +1161,39 @@
 
         async function setHADatetime(entityId, datetime) {
             try {
+                console.log(`Setting HA datetime for ${entityId} to:`, datetime);
+                
+                // Format the datetime correctly for Home Assistant
+                let formattedDatetime;
+                if (datetime === '') {
+                    // For clearing the datetime, use a far past date instead of empty string
+                    formattedDatetime = '1970-01-01 00:00:00';
+                } else {
+                    // Convert ISO string to Home Assistant format (YYYY-MM-DD HH:MM:SS)
+                    const date = new Date(datetime);
+                    formattedDatetime = date.toISOString()
+                        .replace('T', ' ')
+                        .replace(/\.\d+Z$/, '');
+                }
+                
+                console.log('Formatted datetime:', formattedDatetime);
+                
                 const result = await callHAService('input_datetime', 'set_datetime', {
                     entity_id: entityId,
-                    datetime: datetime
+                    datetime: formattedDatetime
                 });
+                console.log(`Successfully set HA datetime for ${entityId}:`, result);
+                
+                // Wait for state to update
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Verify the datetime was set correctly
+                const verifyDatetime = await getHAState(entityId);
+                console.log(`Verification - Datetime for ${entityId} after setting:`, verifyDatetime);
+                
                 return result;
             } catch (error) {
-                console.error('Error setting HA datetime:', error);
+                console.error(`Error setting HA datetime for ${entityId}:`, error);
                 showError(`Failed to set datetime for ${entityId}: ${error.message}`);
                 throw error;
             }
@@ -1009,10 +1236,86 @@
                     throw new Error('Authentication failed');
                 }
                 
+                console.log('Loading saved state from Home Assistant...');
+                
+                // Load one-time code first
+                console.log('Fetching one-time code from:', config.stateEntities.oneTimeCode);
+                const savedOneTimeCode = await getHAState(config.stateEntities.oneTimeCode);
+                console.log('Raw one-time code from HA:', savedOneTimeCode);
+                
+                console.log('Fetching one-time code expiry from:', config.stateEntities.oneTimeCodeExpiry);
+                const savedOneTimeCodeExpiry = await getHAState(config.stateEntities.oneTimeCodeExpiry);
+                console.log('Raw one-time code expiry from HA:', savedOneTimeCodeExpiry);
+                
+                console.log('One-time code state:', {
+                    code: savedOneTimeCode,
+                    expiry: savedOneTimeCodeExpiry,
+                    codeType: typeof savedOneTimeCode,
+                    expiryType: typeof savedOneTimeCodeExpiry
+                });
+                
+                // Load one-time code if it exists and hasn't expired
+                if (savedOneTimeCode && savedOneTimeCode !== '') {
+                    console.log('Processing one-time code...');
+                    let expiry;
+                    if (savedOneTimeCodeExpiry) {
+                        // Parse the expiry time in local timezone
+                        const [datePart, timePart] = savedOneTimeCodeExpiry.split(' ');
+                        const [year, month, day] = datePart.split('-');
+                        const [hours, minutes, seconds] = timePart.split(':');
+                        // Create date string in ISO format with local timezone
+                        const dateStr = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+                        expiry = new Date(dateStr);
+                        console.log('Parsed expiry date (local):', expiry.toLocaleString());
+                        console.log('Current date (local):', new Date().toLocaleString());
+                        console.log('Is expiry in future?', expiry > new Date());
+                    } else {
+                        // If no expiry time is set, set it to 1 hour from now
+                        expiry = new Date(Date.now() + 3600000);
+                        console.log('No expiry time found, setting to 1 hour from now:', expiry);
+                        await setHADatetime(config.stateEntities.oneTimeCodeExpiry, expiry.toISOString());
+                    }
+                    
+                    if (expiry > new Date()) {
+                        console.log('One-time code is valid, setting current state');
+                        currentOneTimeCode = {
+                            code: savedOneTimeCode,
+                            expiry: expiry
+                        };
+                        oneTimeCodeDisplay.textContent = savedOneTimeCode;
+                        oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiry)}`;
+                        oneTimeCodeStatus.textContent = 'Code Active';
+                        oneTimeCodeStatus.className = 'status success';
+                        console.log('Successfully loaded active one-time code:', savedOneTimeCode);
+                    } else {
+                        console.log('One-time code expired, clearing...');
+                        // Clear expired one-time code
+                        await setHAState(config.stateEntities.oneTimeCode, '');
+                        await setHADatetime(config.stateEntities.oneTimeCodeExpiry, '');
+                        oneTimeCodeDisplay.textContent = 'Generate Code';
+                        oneTimeCodeExpiry.textContent = '';
+                        oneTimeCodeStatus.textContent = 'No Active Code';
+                        oneTimeCodeStatus.className = 'status';
+                    }
+                } else {
+                    console.log('No valid one-time code found:', {
+                        hasCode: !!savedOneTimeCode,
+                        codeEmpty: savedOneTimeCode === '',
+                        hasExpiry: !!savedOneTimeCodeExpiry
+                    });
+                    // Generate new one-time code automatically
+                    console.log('No one-time code found, generating new one...');
+                    await generateOneTimeCode(60); // Default 60 minutes expiry
+                }
+                
+                // Load daily code
                 const savedDailyCode = await getHAState(config.stateEntities.dailyCode);
                 const savedDailyCodeExpiry = await getHAState(config.stateEntities.dailyCodeExpiry);
-                const savedOneTimeCode = await getHAState(config.stateEntities.oneTimeCode);
-                const savedOneTimeCodeExpiry = await getHAState(config.stateEntities.oneTimeCodeExpiry);
+                
+                console.log('Daily code state:', {
+                    code: savedDailyCode,
+                    expiry: savedDailyCodeExpiry
+                });
                 
                 // Load daily code if it exists and hasn't expired
                 if (savedDailyCode && savedDailyCodeExpiry) {
@@ -1023,39 +1326,14 @@
                         dailyCodeExpiry.textContent = `Expires at ${formatTime(expiry)}`;
                         dailyCodeStatus.textContent = 'Code Active';
                         dailyCodeStatus.className = 'status success';
+                        console.log('Loaded active daily code:', savedDailyCode);
                     } else {
+                        console.log('Daily code expired, generating new...');
                         await generateNewDailyCode();
                     }
                 } else {
+                    console.log('No daily code found, generating new...');
                     await generateNewDailyCode();
-                }
-                
-                // Load one-time code if it exists and hasn't expired
-                if (savedOneTimeCode && savedOneTimeCodeExpiry) {
-                    const expiry = new Date(savedOneTimeCodeExpiry);
-                    if (expiry > new Date()) {
-                        currentOneTimeCode = {
-                            code: savedOneTimeCode,
-                            expiry: expiry
-                        };
-                        oneTimeCodeDisplay.textContent = savedOneTimeCode;
-                        oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiry)}`;
-                        oneTimeCodeStatus.textContent = 'Code Active';
-                        oneTimeCodeStatus.className = 'status success';
-                    } else {
-                        // Clear expired one-time code
-                        await setHAState(config.stateEntities.oneTimeCode, '');
-                        await setHADatetime(config.stateEntities.oneTimeCodeExpiry, '');
-                        oneTimeCodeDisplay.textContent = 'Generate Code';
-                        oneTimeCodeExpiry.textContent = '';
-                        oneTimeCodeStatus.textContent = 'No Active Code';
-                        oneTimeCodeStatus.className = 'status';
-                    }
-                } else {
-                    oneTimeCodeDisplay.textContent = 'Generate Code';
-                    oneTimeCodeExpiry.textContent = '';
-                    oneTimeCodeStatus.textContent = 'No Active Code';
-                    oneTimeCodeStatus.className = 'status';
                 }
 
                 showLoading(false);
@@ -1119,9 +1397,9 @@
         // Generate One-Time Code
         async function generateOneTimeCode(expiryMinutes) {
             try {
-                showLoading(true);
                 let code = '';
-                for (let i = 0; i < 8; i++) {
+                // Generate a 6-digit code to match the input_text entity's max length
+                for (let i = 0; i < 6; i++) {
                     code += Math.floor(Math.random() * 10).toString();
                 }
                 
@@ -1131,24 +1409,74 @@
                     expiry: expiryTime
                 };
                 
+                console.log('Generating one-time code:', {
+                    code: code,
+                    expiry: expiryTime.toISOString()
+                });
+                
+                // Clear existing state first
+                console.log('Clearing existing one-time code...');
+                await callHAService('input_text', 'set_value', {
+                    entity_id: config.stateEntities.oneTimeCode,
+                    value: ''
+                });
+                
+                // Wait a moment for the clear to take effect
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
                 // Save to Home Assistant
-                await setHAState(config.stateEntities.oneTimeCode, code);
-                await setHADatetime(config.stateEntities.oneTimeCodeExpiry, expiryTime.toISOString());
+                console.log('Saving one-time code to Home Assistant...');
+                await callHAService('input_text', 'set_value', {
+                    entity_id: config.stateEntities.oneTimeCode,
+                    value: code
+                });
+                console.log('One-time code saved successfully');
+                
+                console.log('Saving expiry time to Home Assistant...');
+                // Format the expiry time in local timezone (YYYY-MM-DD HH:MM:SS)
+                const formattedExpiry = expiryTime.toLocaleString('sv', { 
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: false
+                }).replace(' ', 'T').replace(',', '');
+                await callHAService('input_datetime', 'set_datetime', {
+                    entity_id: config.stateEntities.oneTimeCodeExpiry,
+                    datetime: formattedExpiry
+                });
+                console.log('Expiry time saved successfully');
+                
+                // Wait for states to update
+                await new Promise(resolve => setTimeout(resolve, 2000));
+                
+                // Verify the save
+                const savedCode = await getHAState(config.stateEntities.oneTimeCode);
+                const savedExpiry = await getHAState(config.stateEntities.oneTimeCodeExpiry);
+                console.log('Verification - Saved state:', {
+                    code: savedCode,
+                    expiry: savedExpiry
+                });
+                
+                if (savedCode !== code) {
+                    throw new Error(`Failed to save code. Expected: ${code}, Got: ${savedCode}`);
+                }
                 
                 // Update UI immediately
                 oneTimeCodeDisplay.textContent = code;
+                oneTimeCodeDisplay.className = 'code-display';
                 oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiryTime)}`;
                 oneTimeCodeStatus.textContent = 'Code Generated';
                 oneTimeCodeStatus.className = 'status success';
                 
                 showSuccess('New code generated successfully');
-                showLoading(false);
             } catch (error) {
                 console.error('Error generating one-time code:', error);
-                showError('Failed to generate code');
+                showError('Failed to generate code: ' + error.message);
                 oneTimeCodeStatus.textContent = 'Generation Failed';
                 oneTimeCodeStatus.className = 'status error';
-                showLoading(false);
             }
         }
 
@@ -1161,49 +1489,66 @@
 
             try {
                 let isValid = false;
+                const keypadDisplay = document.querySelector('.keypad-display');
+                
                 if (code === currentDailyCode) {
                     isValid = true;
                     showSuccess('Access granted - Daily Code');
                 } else if (currentOneTimeCode && code === currentOneTimeCode.code) {
+                    console.log('One-time code validated successfully:', code);
                     isValid = true;
                     showSuccess('Access granted - One-Time Code');
-                    // Clear one-time code after use
-                    currentOneTimeCode = null;
-                    await setHAState(config.stateEntities.oneTimeCode, '');
-                    await setHADatetime(config.stateEntities.oneTimeCodeExpiry, '');
-                    oneTimeCodeDisplay.textContent = 'Generate Code';
-                    oneTimeCodeExpiry.textContent = '';
-                    oneTimeCodeStatus.textContent = 'Code Used';
-                    oneTimeCodeStatus.className = 'status';
+                    // Strike through the used code immediately
+                    oneTimeCodeDisplay.textContent = currentOneTimeCode.code;
+                    oneTimeCodeDisplay.className = 'code-display used';
+                    oneTimeCodeStatus.textContent = 'Generating New Code...';
+                    oneTimeCodeStatus.className = 'status warning';
                 }
 
-                const keypadDisplay = document.querySelector('.keypad-display');
-                
                 if (isValid) {
                     keypadDisplay.className = 'keypad-display success';
+                    keypadDisplay.innerHTML = `<span class="material-icons lock-icon">lock_open</span>Unlocked`;
                     try {
-                        // Activate Tasmota switch
-                        await callHAService('switch', 'turn_on', {
+                        console.log('Unlocking door (turning off mag lock):', config.tasmotaSwitch);
+                        console.log('Making service call to:', `${config.HA_URL}/api/services/switch/turn_off`);
+                        const result = await callHAService('switch', 'turn_off', {
                             entity_id: config.tasmotaSwitch
                         });
+                        console.log('Door unlock result:', result);
+
+                        // Generate new one-time code after successful unlock
+                        if (code === currentOneTimeCode?.code) {
+                            console.log('Generating new one-time code after use...');
+                            // Use setTimeout to not block the door unlock
+                            setTimeout(async () => {
+                                await generateOneTimeCode(60); // Default 60 minutes expiry
+                                oneTimeCodeStatus.textContent = 'New Code Generated';
+                                oneTimeCodeStatus.className = 'status success';
+                            }, 0);
+                        }
                         
-                        // Turn off after 10 seconds
+                        // Lock after 15 seconds (turn on mag lock)
                         setTimeout(async () => {
                             try {
-                                await callHAService('switch', 'turn_off', {
+                                console.log('Locking door (turning on mag lock):', config.tasmotaSwitch);
+                                console.log('Making service call to:', `${config.HA_URL}/api/services/switch/turn_on`);
+                                await callHAService('switch', 'turn_on', {
                                     entity_id: config.tasmotaSwitch
                                 });
                                 keypadDisplay.className = 'keypad-display';
-                                keypadDisplay.textContent = 'Enter Code';
+                                keypadDisplay.innerHTML = `<span class="material-icons lock-icon">lock</span>Enter Code`;
                             } catch (error) {
+                                console.error('Failed to lock door:', error);
                                 showError('Failed to lock door automatically');
                             }
-                        }, 10000);
+                        }, 15000);
                     } catch (error) {
-                        showError('Failed to unlock door');
+                        console.error('Failed to unlock door:', error);
+                        showError('Failed to unlock door: ' + error.message);
                     }
                 } else {
                     keypadDisplay.className = 'keypad-display error';
+                    keypadDisplay.innerHTML = `<span class="material-icons lock-icon">lock</span>Invalid Code`;
                     attemptsRemaining--;
                     if (attemptsRemaining <= 0) {
                         isLockedOut = true;
@@ -1214,7 +1559,7 @@
                     }
                     setTimeout(() => {
                         keypadDisplay.className = 'keypad-display';
-                        keypadDisplay.textContent = 'Enter Code';
+                        keypadDisplay.innerHTML = `<span class="material-icons lock-icon">lock</span>Enter Code`;
                     }, 2000);
                 }
                 enteredCode = '';
@@ -1249,21 +1594,21 @@
         }
 
         // Event Listeners
-        generateButton.addEventListener('click', () => {
+        generateButton.addEventListener('click', async function handleGenerateClick() {
             generateModal.style.display = 'block';
         });
 
-        closeModal.addEventListener('click', () => {
+        closeModal.addEventListener('click', function handleCloseModal() {
             generateModal.style.display = 'none';
         });
 
-        confirmGenerate.addEventListener('click', async () => {
+        confirmGenerate.addEventListener('click', async function handleConfirmGenerate() {
             const expiryMinutes = parseInt(codeExpiryInput.value) || 60;
             generateModal.style.display = 'none';
             await generateOneTimeCode(expiryMinutes);
         });
 
-        checkAccessButton.addEventListener('click', () => {
+        checkAccessButton.addEventListener('click', function handleCheckAccess() {
             if (isLockedOut) {
                 accessStatus.textContent = 'System Locked Out';
                 accessStatus.className = 'status error';
@@ -1291,35 +1636,6 @@
             updateAttemptsDisplay();
         });
 
-        // Initialize with error handling
-        async function init() {
-            try {
-                showLoading(true);
-                await loadConfig();
-                const isAuthenticated = await verifyAuth();
-                if (!isAuthenticated) {
-                    throw new Error('Authentication failed');
-                }
-                
-                await loadSavedState();
-                updateAttemptsDisplay();
-                setInterval(() => updateDailyCode(), 60000);
-                setInterval(checkLockout, 1000);
-                
-                checkYamlVersion();
-                
-                showSuccess('System initialized successfully');
-                showLoading(false);
-            } catch (error) {
-                console.error('Error initializing system:', error);
-                showError('Failed to initialize system. Please refresh the page.');
-                showLoading(false);
-            }
-        }
-
-        // Initialize the system
-        init();
-
         // Update version number on load
         const versionNumber = document.getElementById('versionNumber');
         if (versionNumber) {
@@ -1337,11 +1653,13 @@
                     return;
                 }
 
+                console.log('Checking YAML version...');
                 const response = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.version}`, {
                     headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
                 });
                 
                 if (!response.ok) {
+                    console.log('Version check failed:', response.status);
                     versionStatus.style.display = 'inline';
                     versionStatus.textContent = '(YAML update required)';
                     versionInfo.style.opacity = '0.5';
@@ -1349,12 +1667,18 @@
                 }
                 
                 const data = await response.json();
+                console.log('Current YAML version:', data.state);
+                console.log('Required version:', config.VERSION);
+                
                 if (data.state === config.VERSION) {
+                    console.log('YAML version is up to date');
                     versionStatus.style.display = 'none';
+                    versionStatus.textContent = '(YAML version: ' + data.state + ', Required: ' + config.VERSION + ')';
                     versionInfo.style.opacity = '1';
                 } else {
+                    console.log('YAML version mismatch');
                     versionStatus.style.display = 'inline';
-                    versionStatus.textContent = `(YAML version: ${data.state})`;
+                    versionStatus.textContent = '(YAML version: ' + data.state + ', Required: ' + config.VERSION + ')';
                     versionInfo.style.opacity = '0.5';
                 }
             } catch (error) {
@@ -1469,79 +1793,48 @@
             });
         }
 
-        // Update init function to include device-specific initialization
-        async function init() {
-            try {
-                showLoading(true);
-                initDeviceSpecific();
-                await loadConfig();
-                const isAuthenticated = await verifyAuth();
-                if (!isAuthenticated) {
-                    throw new Error('Authentication failed');
-                }
-                
-                await loadSavedState();
-                updateAttemptsDisplay();
-                setInterval(() => updateDailyCode(), 60000);
-                setInterval(checkLockout, 1000);
-                
-                checkYamlVersion();
-                
-                showSuccess('System initialized successfully');
-                showLoading(false);
-            } catch (error) {
-                console.error('Error initializing system:', error);
-                showError('Failed to initialize system. Please refresh the page.');
-                showLoading(false);
+        // Add event listener for debug button
+        document.addEventListener('DOMContentLoaded', function() {
+            const debugButton = document.getElementById('debugOneTimeCode');
+            if (debugButton) {
+                debugButton.addEventListener('click', debugOneTimeCode);
+            } else {
+                console.warn('Debug button not found in DOM');
             }
-        }
+        });
 
-        // Initialize the application
-        async function initializeApp() {
-            try {
-                await loadConfig();
-                const isAuthenticated = await verifyAuth();
-                if (!isAuthenticated) {
-                    throw new Error('Authentication failed');
-                }
-                
-                // Initialize version tracker if available
-                if (typeof VersionTracker !== 'undefined') {
-                    try {
-                        versionTracker = new VersionTracker(config);
-                        await versionTracker.checkVersion();
-                    } catch (versionError) {
-                        console.warn('Version tracking not available:', versionError);
-                    }
-                } else {
-                    console.warn('Version tracking not available - version_tracking.js may not be loaded');
-                }
-                
-                // Initialize the rest of your application
-                const state = await getLockState(false);
-                
-                // Set up polling interval
-                setInterval(() => {
-                    getLockState(true).catch(error => {
-                        console.error('Background poll error:', error);
-                    });
-                }, 60000);
-
-                updateSunsetTime();
-                setInterval(updateSunsetTime, 3600000);
-                
-                // Initialize timer if unlocked
-                if (state === 'off') {
-                    initializeTimer();
-                }
-                
-                updateInfoBar();
-                setInterval(updateInfoBar, 60000);
-            } catch (error) {
-                console.error('Error initializing app:', error);
-                showError('Failed to initialize application. Please check your configuration and token.');
+        // Add copy functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const copyButton = document.getElementById('copyDebug');
+            if (copyButton) {
+                copyButton.addEventListener('click', function() {
+                    const debugOutput = document.getElementById('debugOutput');
+                    const text = debugOutput.textContent;
+                    
+                    // Create a temporary textarea element
+                    const textarea = document.createElement('textarea');
+                    textarea.value = text;
+                    document.body.appendChild(textarea);
+                    
+                    // Select and copy the text
+                    textarea.select();
+                    document.execCommand('copy');
+                    
+                    // Remove the temporary element
+                    document.body.removeChild(textarea);
+                    
+                    // Show feedback
+                    const button = this;
+                    const originalText = button.innerHTML;
+                    button.innerHTML = '<span class="material-icons" style="font-size: 1em;">check</span>';
+                    setTimeout(() => {
+                        button.innerHTML = originalText;
+                    }, 2000);
+                });
+            } else {
+                console.warn('Copy button not found in DOM');
             }
-        }
+        });
     </script>
 </body>
 </html> 

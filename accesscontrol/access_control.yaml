@@ -1,5 +1,5 @@
 # Advanced Wiegand Access Control System
-# Version 2.1.0
+# Version 2.2.0
 
 # Core Switch Configuration
 switch:
@@ -54,13 +54,12 @@ sensor:
 
 # Input Text Configuration
 input_text:
-  - name: "Lock Control Daily Access Code"
+  - name: "Lock Control Daily Code"
     id: lockcontrol_daily_code
-    max: 6
+    max: 8
     min: 6
     pattern: "[0-9]*"
     mode: text
-    initial: "123456"
   - name: "Allowed Codes"
     id: allowed_codes
     initial: "123456,654321,112233"
@@ -76,6 +75,12 @@ input_text:
     min: 1
     mode: text
     initial: "2.1.0"
+  - name: "Lock Control One-Time Code"
+    id: lockcontrol_one_time_code
+    max: 8
+    min: 6
+    pattern: "[0-9]*"
+    mode: text
 
 # Input Number Configuration
 input_number:
@@ -111,7 +116,7 @@ input_datetime:
     id: lockcontrol_daily_code_expiry
     has_date: true
     has_time: true
-  - name: "Lock Control One Time Code Expiry"
+  - name: "Lock Control One-Time Code Expiry"
     id: lockcontrol_one_time_code_expiry
     has_date: true
     has_time: true

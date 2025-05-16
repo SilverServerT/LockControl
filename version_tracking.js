@@ -34,10 +34,7 @@ class VersionTracker {
         try {
             // Create version entities
             const entities = {
-                'version_lockcontrol': 'Lock Control Version',
-                'version_lockcontrolv2': 'Lock Control V2 Version',
-                'version_admin': 'Admin Dashboard Version',
-                'version_multi': 'Multi Dashboard Version'
+                'version_lockcontrol': 'Lock Control Version'
             };
 
             for (const [entityId, name] of Object.entries(entities)) {
@@ -75,10 +72,7 @@ class VersionTracker {
                         title: "Version Sync Check",
                         message: `
                             {% set versions = {
-                                'lockcontrol': states('input_text.version_lockcontrol'),
-                                'lockcontrolv2': states('input_text.version_lockcontrolv2'),
-                                'admin': states('input_text.version_admin'),
-                                'multi': states('input_text.version_multi')
+                                'lockcontrol': states('input_text.version_lockcontrol')
                             } %}
                             {% set all_same = versions.values()|unique|length == 1 %}
                             {% if all_same %}

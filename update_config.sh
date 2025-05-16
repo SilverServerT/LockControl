@@ -201,6 +201,7 @@ cp -f admin_panel.html "${HA_PATH}/"
 cp -f "$CONFIG_FILE" "${HA_PATH}/"
 cp -f config.template "${HA_PATH}/"
 cp -f keylock_reader.yaml "${HA_PATH}/"
+cp -f version_tracking.js "${HA_PATH}/"
 cp -f accesscontrol/access_control.yaml "${HA_PATH}/accesscontrol/"
 cp -f accesscontrol/access_control_iterations.yaml "${HA_PATH}/accesscontrol/"
 
@@ -208,6 +209,7 @@ cp -f accesscontrol/access_control_iterations.yaml "${HA_PATH}/accesscontrol/"
 echo -e "${YELLOW}Setting permissions...${NC}"
 chmod 644 "${HA_PATH}"/*.html
 chmod 644 "${HA_PATH}"/*.yaml
+chmod 644 "${HA_PATH}"/*.js
 chmod 644 "${HA_PATH}/accesscontrol"/*.yaml
 chmod 600 "${HA_PATH}/$CONFIG_FILE"
 
@@ -216,11 +218,13 @@ echo -e "${YELLOW}Setting ownership...${NC}"
 if [ -d "/var/lib/docker" ]; then
     chown www-data:www-data "${HA_PATH}"/*.html
     chown www-data:www-data "${HA_PATH}"/*.yaml
+    chown www-data:www-data "${HA_PATH}"/*.js
     chown www-data:www-data "${HA_PATH}/accesscontrol"/*.yaml
     chown www-data:www-data "${HA_PATH}/$CONFIG_FILE"
 else
     chown $(whoami):$(whoami) "${HA_PATH}"/*.html
     chown $(whoami):$(whoami) "${HA_PATH}"/*.yaml
+    chown $(whoami):$(whoami) "${HA_PATH}"/*.js
     chown $(whoami):$(whoami) "${HA_PATH}/accesscontrol"/*.yaml
     chown $(whoami):$(whoami) "${HA_PATH}/$CONFIG_FILE"
 fi

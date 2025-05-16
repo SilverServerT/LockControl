@@ -1,70 +1,60 @@
 # Changelog
 
-All notable changes to the Lock Control Interface will be documented in this file.
-
-## [2.1.0] - 2024-03-20
+## [2.2.0] - 2024-03-19
 
 ### Added
-- Debug button to clear all states
-- Improved state management for magnetic lock
-- Enhanced timer handling system
-
-### Fixed
-- Lock state persistence issues
-- Timer interference with manual lock/unlock
-- Countdown timer display issues
-- State transitions for magnetic lock (ON = locked, OFF = unlocked)
+- One-time code display and polling
+- More frequent state updates (10s interval for one-time code)
+- Debug logging for state changes
+- Error handling improvements
 
 ### Changed
-- Separated immediate toggle from timed unlock functionality
-- Improved timer state management
-- Enhanced error handling for state transitions
-- Better UI feedback for lock operations
+- Removed WebSocket implementation in favor of polling
+- Updated README to reflect example/debug nature of code
+- Improved error messages and logging
 
-## [2.0.0] - 2024-03-19
+### Known Issues
+- Some features may not work as expected
+- Error handling is incomplete
+- Mobile responsiveness needs improvement
+- State synchronization may have delays
+- Documentation is incomplete
+
+## [2.1.0] - 2024-03-18
 
 ### Added
-- Mobile debug panel (🔍 button in bottom right)
-  - Detailed logs with timestamps
-  - Device information display
-  - Config loading attempt tracking
-  - Network request monitoring
-  - JavaScript error catching
-  - Unhandled promise rejection monitoring
-- Cache management features
-  - "Clear Cache & Reload" button for mobile
-  - Automatic cache-busting for config files
-  - LocalStorage backup for configuration
+- Version tracking system
+- YAML update notifications
+- Debug panel improvements
+- State management logging
+
+### Changed
+- Updated configuration handling
+- Improved error reporting
 - Enhanced mobile support
-  - Improved touch handling
-  - Better error recovery
-  - Mobile-specific optimizations
-- Detailed logging system
-  - Config loading status
-  - Network request details
-  - Error tracking
-  - Device information
 
-### Fixed
-- Config loading issues on mobile devices
-- Cache-related problems
-- Mobile-specific error handling
-- Token status display
-- Version checking reliability
+## [2.0.0] - 2024-03-17
+
+### Added
+- Complete rewrite of the interface
+- New mobile-friendly design
+- Weather information display
+- Sunset/sunrise time display
+- Brandweer status display
+- Daily code system
+- Multiple unlock duration options
 
 ### Changed
-- Improved error handling system
-- Enhanced mobile UI responsiveness
-- Better config file path handling
-- More robust initialization process
+- Improved state management
+- Enhanced error handling
+- Better mobile responsiveness
+- More intuitive UI
 
-## [1.0.0] - 2024-03-18
+## [1.0.0] - 2024-03-16
 
 ### Added
 - Initial release
 - Basic lock control functionality
-- Timer-based unlocking
-- Weather and time information
-- Brandweer notifications
-- Garbage collection schedule
-- Version checking 
+- Simple status display
+- Mobile support
+- Home Assistant integration 

@@ -22,6 +22,20 @@
             --unlocked: #d32f2f;  /* Red for unlocked (unsafe) */
         }
 
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
         html, body {
             height: 100%;
             margin: 0;
@@ -51,6 +65,7 @@
             transition: border-color 0.3s;
             border: 4px solid #bbb;
             overflow-y: auto;
+            width: 100%;
         }
 
         .container.locked {
@@ -107,6 +122,7 @@
             padding: 15px;
             border-radius: var(--radius);
             margin-bottom: 20px;
+            box-sizing: border-box;
         }
 
         .daily-code-header {
@@ -179,6 +195,8 @@
             transition: all var(--transition);
             font-weight: 500;
             gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .lock-button .material-icons {
@@ -201,6 +219,8 @@
                 min-height: auto;
                 height: auto;
                 overflow-y: visible;
+                width: 100%;
+                box-sizing: border-box;
             }
 
             .header h1 {
@@ -211,12 +231,38 @@
                 flex-wrap: wrap;
                 gap: 10px;
                 padding: 12px;
+                width: 100%;
+                box-sizing: border-box;
             }
 
             .info-item {
                 flex: 1;
                 min-width: 45%;
                 justify-content: center;
+            }
+
+            .daily-code {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .lock-button {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .duration-buttons {
+                width: 100%;
+                box-sizing: border-box;
+            }
+
+            .duration-buttons .lock-button {
+                flex: 1;
+                min-width: 0;
+                max-width: none;
+                padding: 10px;
+                font-size: 0.9em;
+                background: var(--unlocked);
             }
         }
 
@@ -226,25 +272,17 @@
             margin-top: 15px;
             flex-wrap: wrap;
             justify-content: center;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .duration-buttons .lock-button {
             flex: 1;
-            min-width: 80px;
-            max-width: 120px;
+            min-width: 0;
+            max-width: none;
             padding: 10px;
             font-size: 0.9em;
             background: var(--unlocked);
-        }
-
-        .duration-buttons .lock-button:hover {
-            background: var(--unlocked);
-            opacity: 0.9;
-        }
-
-        .duration-buttons .lock-button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
         }
 
         .success-message, .error-message {
@@ -503,6 +541,16 @@
             <div id="dailyCodeExpiry" class="code-expiry"></div>
         </div>
 
+        <!-- Add One-Time Code section -->
+        <div class="daily-code">
+            <div class="daily-code-header">
+                <span class="material-icons">vpn_key</span>
+                <span>One-Time Code</span>
+            </div>
+            <div id="oneTimeCode" class="code-display">Loading...</div>
+            <div id="oneTimeCodeExpiry" class="code-expiry"></div>
+        </div>
+
         <div class="info-bar">
             <div class="info-item">
                 <span class="material-icons">schedule</span>
@@ -544,18 +592,29 @@
         </div>
     </div>
 
+    <!-- Add version info -->
+    <div id="versionInfo" class="version-info" style="text-align: center; margin-top: 20px; padding: 10px; font-size: 0.8em; color: #888; opacity: 0.5; border-top: 1px solid rgba(0,0,0,0.1);">
+        <span id="versionNumber">v2.2.0</span>
+        <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800; display: none;">(YAML update required)</span>
+    </div>
+
+    <!-- Load configuration first -->
+    <script src="version_tracking.js"></script>
     <script>
         const config = {
             HA_TOKEN: '',
             HA_URL: window.location.origin.replace('http://', 'https://'),
-            VERSION: '2.1.0',
+            VERSION: '2.2.0',
             timezone: 'Europe/Amsterdam',
             tasmotaSwitch: 'switch.tasmota',
             stateEntities: {
                 dailyCode: "input_text.lockcontrol_daily_code",
                 dailyCodeExpiry: "input_datetime.lockcontrol_daily_code_expiry",
-                friesland: "sensor.friesland",
-                unlockEnd: "input_datetime.lock_unlock_end"
+                friesland: "sensor.brandweerdiensten",
+                unlockEnd: "input_datetime.lock_unlock_end",
+                oneTimeCode: "input_text.lockcontrol_one_time_code",
+                oneTimeCodeExpiry: "input_datetime.lockcontrol_one_time_code_expiry",
+                version: "sensor.lockcontrol_version"
             }
         };
 
@@ -742,16 +801,6 @@
             }
             loadingDiv.style.display = show ? 'flex' : 'none';
         }
-
-        // Add spinner animation
-        const style = document.createElement('style');
-        style.textContent = `
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        `;
-        document.head.appendChild(style);
 
         // Update toggleLock function
         async function toggleLock() {
@@ -1136,8 +1185,7 @@
                 const currentTime = new Date().toLocaleTimeString('nl-NL', {
                     hour: '2-digit',
                     minute: '2-digit',
-                    hour12: false,
-                    timeZone: config.timezone
+                    hour12: false
                 });
                 brandweerTimestamp.innerHTML = `<span class="material-icons">update</span> ${currentTime}`;
 
@@ -1164,12 +1212,16 @@
                             }
                         }
 
-                        // Get the time from the tijd attribute
-                        const time = entry.attributes?.tijd || '--:--';
+                        // Get the time from the last_changed timestamp
+                        const time = new Date(entry.last_changed).toLocaleTimeString('nl-NL', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
                         console.log('Entry time:', {
-                            tijd: entry.attributes?.tijd,
-                            state: entry.state,
-                            last_changed: entry.last_changed
+                            last_changed: entry.last_changed,
+                            formatted_time: time,
+                            state: entry.state
                         });
                         
                         return `
@@ -1392,7 +1444,57 @@
             }
         }
 
-        // Update the init function to include weather updates
+        // Add one-time code functions
+        async function updateOneTimeCode() {
+            if (!config.HA_TOKEN) {
+                console.error('No token available');
+                document.getElementById('oneTimeCode').textContent = 'Error: No token';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.oneTimeCode}`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const oneTimeCode = document.getElementById('oneTimeCode');
+                const oneTimeCodeExpiry = document.getElementById('oneTimeCodeExpiry');
+                
+                if (data && data.state && data.state !== 'unknown' && data.state !== '') {
+                    oneTimeCode.textContent = data.state;
+                    
+                    const expiryResponse = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.oneTimeCodeExpiry}`, {
+                        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                    });
+                    
+                    if (expiryResponse.ok) {
+                        const expiryData = await expiryResponse.json();
+                        if (expiryData && expiryData.state) {
+                            const expiry = new Date(expiryData.state);
+                            oneTimeCodeExpiry.textContent = `Expires at ${expiry.toLocaleTimeString('nl-NL', { 
+                                hour: '2-digit', 
+                                minute: '2-digit', 
+                                hour12: false,
+                                timeZone: config.timezone 
+                            })}`;
+                        }
+                    }
+                } else {
+                    oneTimeCode.textContent = 'No code available';
+                    oneTimeCodeExpiry.textContent = '';
+                }
+            } catch (error) {
+                console.error('Error fetching one-time code:', error);
+                document.getElementById('oneTimeCode').textContent = 'Error loading code';
+            }
+        }
+
+        // Update the init function to include one-time code updates
         async function init() {
             try {
                 // First load and validate configuration
@@ -1405,6 +1507,10 @@
                 // Update daily code
                 updateDailyCode();
                 setInterval(updateDailyCode, 60000);
+                
+                // Update one-time code more frequently
+                updateOneTimeCode();
+                setInterval(updateOneTimeCode, 10000); // Update every 10 seconds
                 
                 // Update Friesland sensor
                 updateFrieslandSensor();
@@ -1643,70 +1749,105 @@
             }
         });
 
-        // Add callService function
-        async function callService(service, data) {
-            try {
-                // Split the service into domain and service name
-                const [domain, serviceName] = service.split('.');
-                console.log('Calling service:', domain, serviceName, 'with data:', data);
-                
-                const response = await fetch(`${config.HA_URL}/api/services/${domain}/${serviceName}`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${config.HA_TOKEN}`,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(data)
-                });
+        // Add WebSocket connection for real-time updates
+        let ws = null;
+        let wsRetryCount = 0;
+        const MAX_RETRIES = 5;
+        const RETRY_DELAY = 5000;
 
-                if (!response.ok) {
-                    throw new Error(`Service call failed: ${response.status}`);
+        function connectWebSocket() {
+            if (ws) {
+                ws.close();
+            }
+
+            ws = new WebSocket(`${config.HA_URL.replace('http', 'ws')}/api/websocket`);
+
+            ws.onopen = function() {
+                console.log('WebSocket connected');
+                wsRetryCount = 0;
+                
+                // Subscribe to state changes
+                ws.send(JSON.stringify({
+                    type: 'subscribe_events',
+                    event_type: 'state_changed'
+                }));
+            };
+
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                
+                if (data.type === 'event' && data.event.event_type === 'state_changed') {
+                    const entityId = data.event.data.entity_id;
+                    
+                    // Check for one-time code changes
+                    if (entityId === config.stateEntities.oneTimeCode || 
+                        entityId === config.stateEntities.oneTimeCodeExpiry) {
+                        console.log('One-time code state changed:', data.event.data);
+                        updateOneTimeCode();
+                    }
+                    
+                    // Check for daily code changes
+                    if (entityId === config.stateEntities.dailyCode || 
+                        entityId === config.stateEntities.dailyCodeExpiry) {
+                        console.log('Daily code state changed:', data.event.data);
+                        updateDailyCode();
+                    }
+                    
+                    // Check for lock state changes
+                    if (entityId === config.tasmotaSwitch) {
+                        console.log('Lock state changed:', data.event.data);
+                        currentState = data.event.data.new_state.state;
+                        updateLockStatus();
+                    }
                 }
+            };
 
-                const result = await response.json();
-                console.log('Service call result:', result);
-                return result;
-            } catch (error) {
-                console.error('Error calling service:', error);
-                throw error;
-            }
+            ws.onclose = function() {
+                console.log('WebSocket disconnected');
+                if (wsRetryCount < MAX_RETRIES) {
+                    wsRetryCount++;
+                    console.log(`Retrying WebSocket connection in ${RETRY_DELAY/1000} seconds... (Attempt ${wsRetryCount}/${MAX_RETRIES})`);
+                    setTimeout(connectWebSocket, RETRY_DELAY);
+                } else {
+                    console.error('Max WebSocket retry attempts reached');
+                }
+            };
+
+            ws.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
         }
 
-        // Add storeTimerState function
-        async function storeTimerState(startTime, duration) {
+        // Add refresh functionality
+        async function refreshPage() {
             try {
-                const endTime = new Date(startTime.getTime() + duration * 1000);
-                const year = endTime.getFullYear();
-                const month = String(endTime.getMonth() + 1).padStart(2, '0');
-                const day = String(endTime.getDate()).padStart(2, '0');
-                const hours = String(endTime.getHours()).padStart(2, '0');
-                const minutes = String(endTime.getMinutes()).padStart(2, '0');
-                const secs = String(endTime.getSeconds()).padStart(2, '0');
-                
-                const formattedDate = `${year}-${month}-${day} ${hours}:${minutes}:${secs}`;
-                
-                await callService('input_datetime.set_datetime', {
-                    entity_id: config.stateEntities.unlockEnd,
-                    datetime: formattedDate
-                });
+                showLoading(true);
+                await checkYamlVersion();
+                await updateDailyCode();
+                await updateOneTimeCode();
+                await getLockState();
+                await updateFrieslandSensor();
+                await updateWeatherInfo();
+                await updateSunsetTime();
+                showSuccess('Page refreshed');
             } catch (error) {
-                console.error('Error storing timer state:', error);
-                throw error;
+                console.error('Error refreshing page:', error);
+                showError('Failed to refresh page');
+            } finally {
+                showLoading(false);
             }
         }
 
-        // Add clearTimerState function
-        async function clearTimerState() {
-            try {
-                await callService('input_datetime.set_datetime', {
-                    entity_id: config.stateEntities.unlockEnd,
-                    datetime: "1970-01-01 00:00:00"
-                });
-            } catch (error) {
-                console.error('Error clearing timer state:', error);
-                throw error;
-            }
-        }
+        // Add refresh button
+        const refreshButton = document.createElement('button');
+        refreshButton.className = 'lock-button';
+        refreshButton.style.marginTop = '10px';
+        refreshButton.innerHTML = '<span class="material-icons">refresh</span> Refresh Page';
+        refreshButton.onclick = refreshPage;
+        document.querySelector('.container').appendChild(refreshButton);
+
+        // Add periodic refresh
+        setInterval(refreshPage, 300000); // Refresh every 5 minutes
     </script>
 </body>
 </html>

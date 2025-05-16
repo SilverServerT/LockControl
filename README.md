@@ -1,97 +1,98 @@
-# Lock Control Interface
+# Lock Control System
 
-A modern, mobile-friendly interface for controlling magnetic locks with Home Assistant integration.
+⚠️ **IMPORTANT: This is example code only** ⚠️
+
+This codebase contains debug logging and several unfinished features. It is provided as a reference implementation and should not be used in production without significant modifications.
 
 ## Features
 
-- Real-time lock status monitoring
-- Multiple unlock duration options (10s, 30min, until sunset)
-- Mobile-friendly interface with touch support
-- Automatic timer management
-- Weather and time information
-- Brandweer (Fire Department) notifications
-- Garbage collection schedule display
-- Version checking and YAML update notifications
-- Debug tools for state management
-- Clear separation of immediate and timed lock control
+- Magnetic lock control with status display
+- Daily code generation and display
+- One-time code generation and display
+- Automatic lock status updates
+- Weather information display
+- Sunset/sunrise time display
+- Brandweer (Fire Department) status display
+- Debug logging and state management
+- Version tracking and YAML update notifications
 
-## Mobile Support
+## Debug Features
 
-The interface is fully optimized for mobile devices with:
-- Touch-friendly controls
-- Responsive design
-- Mobile-specific optimizations
-- Debug panel for troubleshooting (🔍 button in bottom right)
-- Cache management tools
-- State management debugging
+- Extensive console logging for troubleshooting
+- State change tracking
+- Error reporting
+- Cache clearing functionality
+- Manual refresh capability
+
+## Unfinished Features
+
+- WebSocket implementation (currently using polling)
+- Some error handling scenarios
+- Complete state synchronization
+- Full mobile responsiveness
+- Complete documentation
+
+## Requirements
+
+- Home Assistant instance
+- Tasmota switch for lock control
+- Input text entities for codes
+- Input datetime entities for expiry times
+- Weather entity
+- Sun entity
+- Brandweer sensor
+
+## Configuration
+
+The system requires several entities to be set up in Home Assistant:
+
+- `input_text.lockcontrol_daily_code`
+- `input_datetime.lockcontrol_daily_code_expiry`
+- `input_text.lockcontrol_one_time_code`
+- `input_datetime.lockcontrol_one_time_code_expiry`
+- `input_datetime.lock_unlock_end`
+- `sensor.brandweerdiensten`
+- `sensor.lockcontrol_version`
 
 ## Installation
 
-1. Copy the `lockcontrol` folder to your Home Assistant's `www` directory
-2. Add the following to your `configuration.yaml`:
-
-```yaml
-input_text:
-  lockcontrol_daily_code:
-    name: Daily Code
-    max: 6
-  lockcontrol_one_time_code:
-    name: One Time Code
-    max: 6
-  version:
-    name: Version
-
-input_datetime:
-  lockcontrol_daily_code_expiry:
-    name: Daily Code Expiry
-    has_date: true
-    has_time: true
-  lockcontrol_one_time_code_expiry:
-    name: One Time Code Expiry
-    has_date: true
-    has_time: true
-  lock_unlock_end:
-    name: Lock Unlock End
-    has_date: true
-    has_time: true
-```
-
-3. Create a `config.js` file in the `lockcontrol` directory with your Home Assistant token:
-
-```javascript
-const config = {
-    HA_TOKEN: 'your_long_lived_access_token',
-    HA_URL: 'https://your-home-assistant-url',
-    VERSION: '2.1.0'
-};
-```
+1. Copy the files to your Home Assistant `www` directory
+2. Set up the required entities in Home Assistant
+3. Configure the `config.js` file with your settings
+4. Access the interface through your Home Assistant instance
 
 ## Usage
 
-1. Access the interface through your Home Assistant instance at `/local/lockcontrol/lockcontrol.html`
-2. Use the interface to control your magnetic lock:
-   - Main toggle button for immediate lock/unlock
-   - Duration buttons for timed unlocks
-   - Debug button to clear all states if needed
-3. For mobile devices, use the debug panel (🔍) if you encounter any issues
+The interface provides:
+- Lock status display
+- Daily code display
+- One-time code display
+- Weather information
+- Sunset/sunrise times
+- Brandweer status
+- Debug controls
 
-## Troubleshooting
+## Debug Mode
 
-### Mobile Issues
-1. Click the 🔍 debug button in the bottom right
-2. Check the debug panel for error messages
-3. Use the "Clear Cache & Reload" button if needed
+The system includes extensive debug logging. Check the browser console for detailed information about:
+- State changes
+- API calls
+- Error conditions
+- Timing information
+- Configuration status
 
-### Lock State Issues
-1. Use the "Clear All States" debug button to reset all states
-2. Verify the lock state in Home Assistant
-3. Check the debug panel for state transition errors
+## Known Issues
 
-### Configuration Issues
-1. Verify your `config.js` file is in the correct location
-2. Check the debug panel for config loading errors
-3. Ensure your Home Assistant token is valid
+- Some features may not work as expected
+- Error handling is incomplete
+- Mobile responsiveness needs improvement
+- State synchronization may have delays
+- Documentation is incomplete
 
-## Version Information
+## Contributing
 
-See [CHANGELOG.md](CHANGELOG.md) for a detailed list of changes and version history.
+This is example code and not actively maintained. Feel free to use it as a reference for your own implementations.
+
+## License
+
+This code is provided as-is with no warranty. Use at your own risk.
