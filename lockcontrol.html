@@ -809,7 +809,7 @@
                 showLoading(true);
 
                 if (currentState === 'on') {
-                    await callService('switch.turn_off', { entity_id: config.tasmotaSwitch });
+                    await callService('switch', 'turn_off', config.tasmotaSwitch);
                     currentState = 'off';
                 } else if (currentState === 'off') {
                     // When manually locking, clear any active timer
@@ -818,7 +818,7 @@
                         timerInterval = null;
                     }
                     await clearTimerState();
-                    await callService('switch.turn_on', { entity_id: config.tasmotaSwitch });
+                    await callService('switch', 'turn_on', config.tasmotaSwitch);
                     currentState = 'on';
                 }
                 updateLockStatus();
@@ -1714,140 +1714,31 @@
             }
         }
 
-        // MQTT Client Setup
-        const client = new Paho.MQTT.Client(location.hostname, 9001, "lockcontrol_" + Math.random().toString(16).substr(2, 8));
-
-        client.onConnectionLost = function(responseObject) {
-            if (responseObject.errorCode !== 0) {
-                console.log("Connection Lost: " + responseObject.errorMessage);
-                updateLockStatus('unknown');
-            }
-        };
-
-        client.onMessageArrived = function(message) {
-            console.log("Message received: " + message.payloadString);
-            if (message.destinationName === "stat/tasmota/POWER") {
-                updateLockStatus(message.payloadString);
-            }
-            // Add debug message handling
-            if (message.destinationName === "lockcontrol/debug") {
-                console.log('Debug Info:', JSON.parse(message.payloadString));
-            }
-        };
-
-        client.connect({
-            onSuccess: function() {
-                console.log("Connected to MQTT broker");
-                client.subscribe("stat/tasmota/POWER");
-                // Subscribe to debug topic
-                client.subscribe("lockcontrol/debug");
-                updateLockStatus('unknown');
-            },
-            onFailure: function(message) {
-                console.log("Connection failed: " + message.errorMessage);
-                updateLockStatus('unknown');
-            }
-        });
-
-        // Add WebSocket connection for real-time updates
-        let ws = null;
-        let wsRetryCount = 0;
-        const MAX_RETRIES = 5;
-        const RETRY_DELAY = 5000;
-
-        function connectWebSocket() {
-            if (ws) {
-                ws.close();
-            }
-
-            ws = new WebSocket(`${config.HA_URL.replace('http', 'ws')}/api/websocket`);
-
-            ws.onopen = function() {
-                console.log('WebSocket connected');
-                wsRetryCount = 0;
-                
-                // Subscribe to state changes
-                ws.send(JSON.stringify({
-                    type: 'subscribe_events',
-                    event_type: 'state_changed'
-                }));
-            };
-
-            ws.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                
-                if (data.type === 'event' && data.event.event_type === 'state_changed') {
-                    const entityId = data.event.data.entity_id;
-                    
-                    // Check for one-time code changes
-                    if (entityId === config.stateEntities.oneTimeCode || 
-                        entityId === config.stateEntities.oneTimeCodeExpiry) {
-                        console.log('One-time code state changed:', data.event.data);
-                        updateOneTimeCode();
-                    }
-                    
-                    // Check for daily code changes
-                    if (entityId === config.stateEntities.dailyCode || 
-                        entityId === config.stateEntities.dailyCodeExpiry) {
-                        console.log('Daily code state changed:', data.event.data);
-                        updateDailyCode();
-                    }
-                    
-                    // Check for lock state changes
-                    if (entityId === config.tasmotaSwitch) {
-                        console.log('Lock state changed:', data.event.data);
-                        currentState = data.event.data.new_state.state;
-                        updateLockStatus();
-                    }
-                }
-            };
-
-            ws.onclose = function() {
-                console.log('WebSocket disconnected');
-                if (wsRetryCount < MAX_RETRIES) {
-                    wsRetryCount++;
-                    console.log(`Retrying WebSocket connection in ${RETRY_DELAY/1000} seconds... (Attempt ${wsRetryCount}/${MAX_RETRIES})`);
-                    setTimeout(connectWebSocket, RETRY_DELAY);
-                } else {
-                    console.error('Max WebSocket retry attempts reached');
-                }
-            };
-
-            ws.onerror = function(error) {
-                console.error('WebSocket error:', error);
-            };
-        }
-
-        // Add refresh functionality
-        async function refreshPage() {
+        // Function to call Home Assistant services
+        async function callService(domain, service, entityId, data = {}) {
             try {
-                showLoading(true);
-                await checkYamlVersion();
-                await updateDailyCode();
-                await updateOneTimeCode();
-                await getLockState();
-                await updateFrieslandSensor();
-                await updateWeatherInfo();
-                await updateSunsetTime();
-                showSuccess('Page refreshed');
+                const response = await fetch(`${window.location.origin}/api/services/${domain}/${service}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        entity_id: entityId,
+                        ...data
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Service call failed: ${response.statusText}`);
+                }
+
+                return await response.json();
             } catch (error) {
-                console.error('Error refreshing page:', error);
-                showError('Failed to refresh page');
-            } finally {
-                showLoading(false);
+                console.error('Error calling service:', error);
+                throw error;
             }
         }
-
-        // Add refresh button
-        const refreshButton = document.createElement('button');
-        refreshButton.className = 'lock-button';
-        refreshButton.style.marginTop = '10px';
-        refreshButton.innerHTML = '<span class="material-icons">refresh</span> Refresh Page';
-        refreshButton.onclick = refreshPage;
-        document.querySelector('.container').appendChild(refreshButton);
-
-        // Add periodic refresh
-        setInterval(refreshPage, 300000); // Refresh every 5 minutes
     </script>
 </body>
 </html>
