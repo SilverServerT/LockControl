@@ -1,0 +1,215 @@
+# Access Control Automations
+
+- id: "initialize_lock_timer"
+  alias: "Initialize Lock Timer"
+  description: "Initialize the lock timer on startup"
+  trigger:
+    - platform: homeassistant
+      event: start
+  action:
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.lock_unlock_end
+      data:
+        datetime: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
+
+- id: "disable_daily_code_at_night"
+  alias: "Disable Daily Code at Night"
+  description: "Disables the daily code during night hours"
+  trigger:
+    - platform: sun
+      event: sunset
+    - platform: sun
+      event: sunrise
+  action:
+    - choose:
+        - conditions:
+            - condition: sun
+              after: sunset
+            - condition: sun
+              before: sunrise
+          sequence:
+            - service: input_text.set_value
+              target:
+                entity_id: input_text.lockcontrol_daily_code
+              data:
+                value: ""
+            - service: notify.access_control_notifications
+              data:
+                message: "Daily code disabled for night hours"
+                title: "Access Control Update"
+        - conditions:
+            - condition: sun
+              after: sunrise
+            - condition: sun
+              before: sunset
+          sequence:
+            - service: script.turn_on
+              target:
+                entity_id: script.reset_daily_code
+            - service: notify.access_control_notifications
+              data:
+                message: "Daily code enabled for day hours"
+                title: "Access Control Update"
+
+- id: "unlock_on_valid_code"
+  alias: "Unlock on Valid Code"
+  description: "Unlocks the door when a valid code is received"
+  trigger:
+    - platform: mqtt
+      topic: "keylock/access_code"
+  condition:
+    - condition: template
+      value_template: "{{ trigger.payload in states('input_text.allowed_codes').split(',') }}"
+    - condition: state
+      entity_id: switch.magnetic_lock
+      state: "on"
+  action:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.magnetic_lock
+    - delay: "00:00:10"  # Unlock duration
+    - service: switch.turn_on
+      target:
+        entity_id: switch.magnetic_lock
+
+- id: "generate_daily_code"
+  alias: "Generate Daily Code"
+  description: "Generates a new daily code at midnight"
+  trigger:
+    - platform: time
+      at: "00:00:00"
+  action:
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.lockcontrol_daily_code
+      data:
+        value: "{{ range(100000, 999999) | random }}"
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.daily_code_used
+    - service: notify.access_control_notifications
+      data:
+        message: "New daily code has been generated"
+        title: "Access Control Update"
+
+- id: "validate_daily_code"
+  alias: "Validate Daily Code"
+  description: "Validates the daily code and manages access"
+  trigger:
+    - platform: mqtt
+      topic: "keylock/access_code"
+  condition:
+    - condition: state
+      entity_id: input_boolean.daily_code_enabled
+      state: "on"
+    - condition: template
+      value_template: "{{ trigger.payload == states('input_text.lockcontrol_daily_code') }}"
+    - condition: state
+      entity_id: input_boolean.daily_code_used
+      state: "off"
+  action:
+    - service: input_boolean.turn_on
+      target:
+        entity_id: input_boolean.daily_code_used
+    - service: switch.turn_off
+      target:
+        entity_id: switch.magnetic_lock
+    - delay: "00:00:10"
+    - service: switch.turn_on
+      target:
+        entity_id: switch.magnetic_lock
+    - service: notify.access_control_notifications
+      data:
+        message: "Door unlocked using daily code"
+        title: "Access Granted"
+
+- id: "notify_daily_code_usage"
+  alias: "Notify Daily Code Usage"
+  description: "Notifies when daily code is used"
+  trigger:
+    - platform: state
+      entity_id: input_boolean.daily_code_used
+      to: "on"
+  action:
+    - service: notify.access_control_notifications
+      data:
+        message: "Daily code has been used. New code will be generated at midnight."
+        title: "Daily Code Status"
+
+- id: "auto_relock_after_duration"
+  alias: "Auto Re-Lock After Timed Unlock"
+  description: "Automatically locks the door when the unlock timer expires"
+  trigger:
+    - platform: template
+      value_template: >
+        {{ now().timestamp() | int >= as_timestamp(states('input_datetime.lock_unlock_end')) | int
+           and states('switch.magnetic_lock') == 'off'
+           and states('input_datetime.lock_unlock_end') != '1970-01-01 00:00:00' }}
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.magnetic_lock
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.lock_unlock_end
+      data:
+        datetime: "1970-01-01 00:00:00"
+    - service: notify.access_control_notifications
+      data:
+        message: "Door has been automatically locked after timed unlock"
+        title: "Door Locked"
+
+- id: "cancel_timed_unlock_on_manual_lock"
+  alias: "Cancel Timed Unlock on Manual Lock"
+  description: "Cancels any timed unlock when the door is manually locked"
+  trigger:
+    - platform: state
+      entity_id: switch.magnetic_lock
+      to: "on"
+  condition:
+    - condition: template
+      value_template: "{{ states('input_datetime.lock_unlock_end') != '1970-01-01 00:00:00' }}"
+  action:
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.lock_unlock_end
+      data:
+        datetime: "1970-01-01 00:00:00"
+
+- id: "lock_at_sunset"
+  alias: "Lock at Sunset"
+  description: "Locks the door when the timer expires"
+  trigger:
+    - platform: state
+      entity_id: input_datetime.lock_unlock_end
+  condition:
+    - condition: template
+      value_template: "{{ states('input_datetime.lock_unlock_end') != '1970-01-01 00:00:00' }}"
+    - condition: template
+      value_template: "{{ now() >= states('input_datetime.lock_unlock_end') | as_datetime }}"
+  action:
+    - service: switch.turn_on
+      target:
+        entity_id: switch.magnetic_lock
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.lock_unlock_end
+      data:
+        datetime: "1970-01-01 00:00:00"
+
+- id: "track_lock_events"
+  alias: "Track Lock Events"
+  description: "Records lock events in the history"
+  trigger:
+    - platform: state
+      entity_id: switch.magnetic_lock
+  action:
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.lockcontrol_last_opener
+      data:
+        value: >
+          {% set event_type = 'Locked' if trigger.to_state.state == 'on' else 'Unlocked' %}
+          {% set method = 'Manual' if trigger.from_state.state == 'off' else 'Automatic' %}
+          {{ event_type }} by {{ method }} at {{ now().strftime('%Y-%m-%d %H:%M:%S') }} 

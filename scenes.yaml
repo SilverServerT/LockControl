@@ -1,0 +1,9 @@
+# Scenes configuration
+# This file contains all your Home Assistant scenes
+
+# Example scene (commented out)
+# - name: "Example Scene"
+#   entities:
+#     light.living_room:
+#       state: "on"
+#       brightness: 100 

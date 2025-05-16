@@ -109,7 +109,7 @@ class VersionTracker {
                 return;
             }
 
-            const response = await fetch(`${this.config.HA_URL}/api/states/${this.config.stateEntities.version}`, {
+            const response = await fetch(`${window.location.origin}/api/states/sensor.lock_control_version`, {
                 headers: { 'Authorization': `Bearer ${this.config.HA_TOKEN}` }
             });
             

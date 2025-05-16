@@ -1,0 +1,49 @@
+title: Access Control
+views:
+  - title: Access Control
+    path: access-control
+    icon: mdi:key
+    cards:
+      - type: entities
+        title: Access Codes
+        entities:
+          - entity: input_text.lockcontrol_daily_code
+            name: Daily Code
+            icon: mdi:key
+          - entity: input_text.lockcontrol_one_time_code
+            name: One-Time Code
+            icon: mdi:vpn-key
+          - entity: input_datetime.lockcontrol_one_time_code_expiry
+            name: One-Time Code Expiry
+            icon: mdi:clock-outline
+
+  - title: Lock History
+    path: lock-history
+    icon: mdi:history
+    panel: true
+    theme: default
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: Recent Lock Operations
+            entities:
+              - entity: input_text.lockcontrol_last_opener
+                name: Last Operation
+                icon: mdi:lock-open
+
+          - type: history-graph
+            title: Lock Operations (24h)
+            entities:
+              - entity: input_text.lockcontrol_last_opener
+                name: Door Access
+            hours_to_show: 24
+            refresh_interval: 60
+
+          - type: custom:template-entity-row
+            entity: input_text.lockcontrol_last_opener
+            name: Lock History
+            icon: mdi:history
+            secondary: "{{ states('input_text.lockcontrol_last_opener') }}"
+            tap_action:
+              action: more-info 

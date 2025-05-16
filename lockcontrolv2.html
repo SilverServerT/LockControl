@@ -574,19 +574,13 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Add debug button after the one-time code card -->
-            <div class="card">
-                <h2>Debug Tools</h2>
-                <button id="debugOneTimeCode" class="button warning">Debug One-Time Code</button>
-                <div style="margin-top: 10px; position: relative;">
-                    <button id="copyDebug" class="button" style="position: absolute; right: 0; top: 0; padding: 5px 10px; font-size: 0.8em;">
-                        <span class="material-icons" style="font-size: 1em;">content_copy</span>
-                    </button>
-                    <div id="debugOutput" class="status" style="margin-top: 10px; text-align: left; font-family: monospace; white-space: pre-wrap; background: #f5f5f5; padding: 10px; border-radius: 4px; user-select: text; -webkit-user-select: text; -moz-user-select: text; -ms-user-select: text; overflow-x: auto;"></div>
-                </div>
-            </div>
         </div>
+    </div>
+
+    <!-- Add version info -->
+    <div id="versionInfo" class="version-info" style="text-align: center; margin-top: 20px; padding: 10px; font-size: 0.8em; color: #888; opacity: 0.5; border-top: 1px solid rgba(0,0,0,0.1);">
+        <span id="versionNumber">v2.2.0</span>
+        <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800; display: none;">(YAML update required)</span>
     </div>
 
     <!-- Generate Code Modal -->
@@ -600,12 +594,6 @@
             </div>
             <button id="confirmGenerate" class="button">Generate</button>
         </div>
-    </div>
-
-    <!-- Add version info -->
-    <div id="versionInfo" class="version-info" style="text-align: center; margin-top: 20px; padding: 10px; font-size: 0.8em; color: #888; opacity: 0.5; border-top: 1px solid rgba(0,0,0,0.1);">
-        <span id="versionNumber">v2.2.0</span>
-        <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800; display: none;">(YAML update required)</span>
     </div>
 
     <!-- Load configuration first -->
@@ -1120,10 +1108,47 @@
                 const currentState = await getHAState(entityId);
                 console.log(`Current state for ${entityId}:`, currentState);
                 
-                // Use the correct service call format for input_text
+                // If we're trying to clear a code (state is empty string)
+                if (state === '') {
+                    console.log('Attempting to clear code...');
+                    // First try to clear it
+                    await callHAService('input_text', 'set_value', {
+                        entity_id: entityId,
+                        value: ''
+                    });
+                    
+                    // Wait for state to update
+                    await new Promise(resolve => setTimeout(resolve, 2000));
+                    
+                    // Check if it was cleared
+                    const verifyState = await getHAState(entityId);
+                    console.log(`Verification after clear attempt:`, verifyState);
+                    
+                    // If still not cleared, try one more time
+                    if (verifyState !== '') {
+                        console.log('Code not cleared, retrying...');
+                        await callHAService('input_text', 'set_value', {
+                            entity_id: entityId,
+                            value: ''
+                        });
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        
+                        const retryState = await getHAState(entityId);
+                        console.log(`Verification after retry:`, retryState);
+                        
+                        // If still not cleared, log warning but continue
+                        if (retryState !== '') {
+                            console.warn(`Could not clear code completely. Current state: ${retryState}`);
+                        }
+                    }
+                    
+                    return { success: true };
+                }
+                
+                // For non-empty states, proceed with normal set
                 const result = await callHAService('input_text', 'set_value', {
                     entity_id: entityId,
-                    value: state.toString() // Ensure value is a string
+                    value: state
                 });
                 console.log(`Service call result:`, result);
                 
@@ -1134,19 +1159,19 @@
                 const verifyState = await getHAState(entityId);
                 console.log(`Verification - State for ${entityId} after setting:`, verifyState);
                 
-                if (verifyState !== state.toString()) {
+                if (verifyState !== state) {
                     console.warn(`State mismatch for ${entityId}. Expected: ${state}, Got: ${verifyState}`);
                     // Try setting the state again if it didn't take
                     console.log('Retrying state set...');
                     await callHAService('input_text', 'set_value', {
                         entity_id: entityId,
-                        value: state.toString()
+                        value: state
                     });
                     await new Promise(resolve => setTimeout(resolve, 2000));
                     const retryState = await getHAState(entityId);
                     console.log(`Retry verification - State for ${entityId}:`, retryState);
                     
-                    if (retryState !== state.toString()) {
+                    if (retryState !== state) {
                         throw new Error(`Failed to set state after retry. Expected: ${state}, Got: ${retryState}`);
                     }
                 }
@@ -1229,7 +1254,6 @@
         // Load saved state from Home Assistant with error handling
         async function loadSavedState() {
             try {
-                showLoading(true);
                 await loadConfig();
                 const isAuthenticated = await verifyAuth();
                 if (!isAuthenticated) {
@@ -1238,12 +1262,69 @@
                 
                 console.log('Loading saved state from Home Assistant...');
                 
-                // Load one-time code first
-                console.log('Fetching one-time code from:', config.stateEntities.oneTimeCode);
+                // First check sun state
+                const sunResponse = await fetch(`${config.HA_URL}/api/states/sun.sun`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                
+                if (!sunResponse.ok) {
+                    throw new Error('Failed to fetch sun state');
+                }
+                
+                const sunData = await sunResponse.json();
+                const sunset = new Date(sunData.attributes.next_setting);
+                const sunrise = new Date(sunData.attributes.next_rising);
+                const now = new Date();
+                
+                // If sunset is tomorrow, get today's sunset
+                if (sunset.getDate() > now.getDate()) {
+                    sunset.setDate(sunset.getDate() - 1);
+                }
+                
+                const isNight = now >= sunset || now < sunrise;
+                
+                // Load daily code first
+                console.log('Loading daily code...');
+                const savedDailyCode = await getHAState(config.stateEntities.dailyCode);
+                const savedDailyCodeExpiry = await getHAState(config.stateEntities.dailyCodeExpiry);
+                
+                console.log('Daily code state:', {
+                    code: savedDailyCode,
+                    expiry: savedDailyCodeExpiry
+                });
+                
+                // Update UI based on time of day
+                if (isNight) {
+                    dailyCodeDisplay.textContent = 'Code disabled at night';
+                    dailyCodeExpiry.textContent = 'Available after sunrise';
+                    dailyCodeStatus.textContent = 'Night Mode';
+                    dailyCodeStatus.className = 'status warning';
+                } else {
+                    // Load daily code if it exists and hasn't expired
+                    if (savedDailyCode && savedDailyCodeExpiry) {
+                        const expiry = new Date(savedDailyCodeExpiry);
+                        if (expiry > now) {
+                            currentDailyCode = savedDailyCode;
+                            dailyCodeDisplay.textContent = currentDailyCode;
+                            dailyCodeExpiry.textContent = `Expires at ${formatTime(expiry)}`;
+                            dailyCodeStatus.textContent = 'Code Active';
+                            dailyCodeStatus.className = 'status success';
+                            console.log('Loaded active daily code:', savedDailyCode);
+                        } else {
+                            console.log('Daily code expired, generating new...');
+                            await generateNewDailyCode();
+                        }
+                    } else {
+                        console.log('No daily code found, generating new...');
+                        await generateNewDailyCode();
+                    }
+                }
+
+                // Now load one-time code
+                console.log('Loading one-time code...');
                 const savedOneTimeCode = await getHAState(config.stateEntities.oneTimeCode);
                 console.log('Raw one-time code from HA:', savedOneTimeCode);
                 
-                console.log('Fetching one-time code expiry from:', config.stateEntities.oneTimeCodeExpiry);
                 const savedOneTimeCodeExpiry = await getHAState(config.stateEntities.oneTimeCodeExpiry);
                 console.log('Raw one-time code expiry from HA:', savedOneTimeCodeExpiry);
                 
@@ -1254,10 +1335,11 @@
                     expiryType: typeof savedOneTimeCodeExpiry
                 });
                 
-                // Load one-time code if it exists and hasn't expired
+                // Check if we have a code and if it's expired
+                let codeExpired = true;
+                let expiry = null;
+                
                 if (savedOneTimeCode && savedOneTimeCode !== '') {
-                    console.log('Processing one-time code...');
-                    let expiry;
                     if (savedOneTimeCodeExpiry) {
                         // Parse the expiry time in local timezone
                         const [datePart, timePart] = savedOneTimeCodeExpiry.split(' ');
@@ -1267,216 +1349,134 @@
                         const dateStr = `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
                         expiry = new Date(dateStr);
                         console.log('Parsed expiry date (local):', expiry.toLocaleString());
-                        console.log('Current date (local):', new Date().toLocaleString());
-                        console.log('Is expiry in future?', expiry > new Date());
-                    } else {
-                        // If no expiry time is set, set it to 1 hour from now
-                        expiry = new Date(Date.now() + 3600000);
-                        console.log('No expiry time found, setting to 1 hour from now:', expiry);
-                        await setHADatetime(config.stateEntities.oneTimeCodeExpiry, expiry.toISOString());
+                        console.log('Current date (local):', now.toLocaleString());
+                        codeExpired = expiry <= now;
+                        console.log('Is code expired?', codeExpired);
                     }
-                    
-                    if (expiry > new Date()) {
-                        console.log('One-time code is valid, setting current state');
-                        currentOneTimeCode = {
-                            code: savedOneTimeCode,
-                            expiry: expiry
-                        };
-                        oneTimeCodeDisplay.textContent = savedOneTimeCode;
-                        oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiry)}`;
-                        oneTimeCodeStatus.textContent = 'Code Active';
-                        oneTimeCodeStatus.className = 'status success';
-                        console.log('Successfully loaded active one-time code:', savedOneTimeCode);
-                    } else {
-                        console.log('One-time code expired, clearing...');
-                        // Clear expired one-time code
-                        await setHAState(config.stateEntities.oneTimeCode, '');
-                        await setHADatetime(config.stateEntities.oneTimeCodeExpiry, '');
-                        oneTimeCodeDisplay.textContent = 'Generate Code';
-                        oneTimeCodeExpiry.textContent = '';
-                        oneTimeCodeStatus.textContent = 'No Active Code';
-                        oneTimeCodeStatus.className = 'status';
-                    }
-                } else {
-                    console.log('No valid one-time code found:', {
-                        hasCode: !!savedOneTimeCode,
-                        codeEmpty: savedOneTimeCode === '',
-                        hasExpiry: !!savedOneTimeCodeExpiry
-                    });
-                    // Generate new one-time code automatically
-                    console.log('No one-time code found, generating new one...');
-                    await generateOneTimeCode(60); // Default 60 minutes expiry
                 }
                 
-                // Load daily code
-                const savedDailyCode = await getHAState(config.stateEntities.dailyCode);
-                const savedDailyCodeExpiry = await getHAState(config.stateEntities.dailyCodeExpiry);
-                
-                console.log('Daily code state:', {
-                    code: savedDailyCode,
-                    expiry: savedDailyCodeExpiry
-                });
-                
-                // Load daily code if it exists and hasn't expired
-                if (savedDailyCode && savedDailyCodeExpiry) {
-                    const expiry = new Date(savedDailyCodeExpiry);
-                    if (expiry > new Date()) {
-                        currentDailyCode = savedDailyCode;
-                        dailyCodeDisplay.textContent = currentDailyCode;
-                        dailyCodeExpiry.textContent = `Expires at ${formatTime(expiry)}`;
-                        dailyCodeStatus.textContent = 'Code Active';
-                        dailyCodeStatus.className = 'status success';
-                        console.log('Loaded active daily code:', savedDailyCode);
-                    } else {
-                        console.log('Daily code expired, generating new...');
-                        await generateNewDailyCode();
-                    }
+                if (codeExpired) {
+                    console.log('Code is expired or not found, generating new one...');
+                    // Clear any existing code and expiry
+                    await setHAState(config.stateEntities.oneTimeCode, '');
+                    await setHADatetime(config.stateEntities.oneTimeCodeExpiry, '');
+                    // Generate new code
+                    await generateOneTimeCode(60); // Default 60 minutes expiry
                 } else {
-                    console.log('No daily code found, generating new...');
-                    await generateNewDailyCode();
+                    console.log('Valid code found, setting current state');
+                    currentOneTimeCode = {
+                        code: savedOneTimeCode,
+                        expiry: expiry
+                    };
+                    oneTimeCodeDisplay.textContent = savedOneTimeCode;
+                    oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiry)}`;
+                    oneTimeCodeStatus.textContent = 'Code Active';
+                    oneTimeCodeStatus.className = 'status success';
+                    console.log('Successfully loaded active one-time code:', savedOneTimeCode);
                 }
 
-                showLoading(false);
             } catch (error) {
                 console.error('Error loading saved state:', error);
                 showError('Failed to load saved state. Please refresh the page.');
-                showLoading(false);
+            }
+        }
+
+        // Update Daily Code
+        async function updateDailyCode() {
+            try {
+                // First check sun state
+                const sunResponse = await fetch(`${config.HA_URL}/api/states/sun.sun`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                
+                if (!sunResponse.ok) {
+                    throw new Error('Failed to fetch sun state');
+                }
+                
+                const sunData = await sunResponse.json();
+                const sunset = new Date(sunData.attributes.next_setting);
+                const sunrise = new Date(sunData.attributes.next_rising);
+                const now = new Date();
+                
+                // If sunset is tomorrow, get today's sunset
+                if (sunset.getDate() > now.getDate()) {
+                    sunset.setDate(sunset.getDate() - 1);
+                }
+                
+                const isNight = now >= sunset || now < sunrise;
+                
+                // Update UI based on time of day
+                if (isNight) {
+                    dailyCodeDisplay.textContent = 'Code disabled at night';
+                    dailyCodeExpiry.textContent = 'Available after sunrise';
+                    dailyCodeStatus.textContent = 'Night Mode';
+                    dailyCodeStatus.className = 'status warning';
+                    return;
+                }
+                
+                // If it's day time, proceed with normal code update
+                const savedExpiry = await getHAState(config.stateEntities.dailyCodeExpiry);
+                
+                if (savedExpiry) {
+                    const expiry = new Date(savedExpiry);
+                    if (expiry <= now) {
+                        await generateNewDailyCode();
+                    }
+                } else {
+                    await generateNewDailyCode();
+                }
+                
+                // Check if within valid hours
+                const hour = now.getHours();
+                if (hour >= 6 && hour < 20) {
+                    dailyCodeStatus.textContent = 'Code Active';
+                    dailyCodeStatus.className = 'status success';
+                } else {
+                    dailyCodeStatus.textContent = 'Outside Valid Hours';
+                    dailyCodeStatus.className = 'status warning';
+                }
+            } catch (error) {
+                console.error('Error updating daily code:', error);
+                dailyCodeDisplay.textContent = 'Error loading code';
+                dailyCodeStatus.textContent = 'Error';
+                dailyCodeStatus.className = 'status error';
             }
         }
 
         // Generate new daily code
         async function generateNewDailyCode() {
-            const now = new Date();
-            const midnight = new Date(now);
-            midnight.setHours(24, 0, 0, 0);
-            
-            currentDailyCode = generateDailyCode();
-            
-            // Save to Home Assistant
-            await setHAState(config.stateEntities.dailyCode, currentDailyCode);
-            await setHADatetime(config.stateEntities.dailyCodeExpiry, midnight.toISOString());
-            
-            dailyCodeDisplay.textContent = currentDailyCode;
-            dailyCodeExpiry.textContent = `Expires at ${formatTime(midnight)}`;
-        }
-
-        // Update Daily Code
-        async function updateDailyCode() {
-            const now = new Date();
-            const savedExpiry = await getHAState(config.stateEntities.dailyCodeExpiry);
-            
-            if (savedExpiry) {
-                const expiry = new Date(savedExpiry);
-                if (expiry <= now) {
-                    await generateNewDailyCode();
-                }
-            } else {
-                await generateNewDailyCode();
-            }
-            
-            // Check if within valid hours
-            const hour = now.getHours();
-            if (hour >= 6 && hour < 20) {
-                dailyCodeStatus.textContent = 'Code Active';
-                dailyCodeStatus.className = 'status success';
-            } else {
-                dailyCodeStatus.textContent = 'Outside Valid Hours';
-                dailyCodeStatus.className = 'status warning';
-            }
-        }
-
-        // Generate Daily Code
-        function generateDailyCode() {
-            let code = '';
-            for (let i = 0; i < config.codeLength; i++) {
-                code += Math.floor(Math.random() * 10).toString();
-            }
-            return code;
-        }
-
-        // Generate One-Time Code
-        async function generateOneTimeCode(expiryMinutes) {
             try {
+                const now = new Date();
+                const midnight = new Date(now);
+                midnight.setHours(24, 0, 0, 0);
+                
+                // Generate a 6-digit code
                 let code = '';
-                // Generate a 6-digit code to match the input_text entity's max length
                 for (let i = 0; i < 6; i++) {
                     code += Math.floor(Math.random() * 10).toString();
                 }
                 
-                const expiryTime = new Date(Date.now() + expiryMinutes * 60000);
-                currentOneTimeCode = {
-                    code: code,
-                    expiry: expiryTime
-                };
-                
-                console.log('Generating one-time code:', {
-                    code: code,
-                    expiry: expiryTime.toISOString()
-                });
-                
-                // Clear existing state first
-                console.log('Clearing existing one-time code...');
-                await callHAService('input_text', 'set_value', {
-                    entity_id: config.stateEntities.oneTimeCode,
-                    value: ''
-                });
-                
-                // Wait a moment for the clear to take effect
-                await new Promise(resolve => setTimeout(resolve, 2000));
+                currentDailyCode = code;
                 
                 // Save to Home Assistant
-                console.log('Saving one-time code to Home Assistant...');
-                await callHAService('input_text', 'set_value', {
-                    entity_id: config.stateEntities.oneTimeCode,
-                    value: code
+                await setHAState(config.stateEntities.dailyCode, code);
+                await setHADatetime(config.stateEntities.dailyCodeExpiry, midnight.toISOString());
+                
+                // Update UI
+                dailyCodeDisplay.textContent = code;
+                dailyCodeExpiry.textContent = `Expires at ${formatTime(midnight)}`;
+                dailyCodeStatus.textContent = 'Code Active';
+                dailyCodeStatus.className = 'status success';
+                
+                console.log('Generated new daily code:', {
+                    code: code,
+                    expiry: midnight.toISOString()
                 });
-                console.log('One-time code saved successfully');
-                
-                console.log('Saving expiry time to Home Assistant...');
-                // Format the expiry time in local timezone (YYYY-MM-DD HH:MM:SS)
-                const formattedExpiry = expiryTime.toLocaleString('sv', { 
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    second: '2-digit',
-                    hour12: false
-                }).replace(' ', 'T').replace(',', '');
-                await callHAService('input_datetime', 'set_datetime', {
-                    entity_id: config.stateEntities.oneTimeCodeExpiry,
-                    datetime: formattedExpiry
-                });
-                console.log('Expiry time saved successfully');
-                
-                // Wait for states to update
-                await new Promise(resolve => setTimeout(resolve, 2000));
-                
-                // Verify the save
-                const savedCode = await getHAState(config.stateEntities.oneTimeCode);
-                const savedExpiry = await getHAState(config.stateEntities.oneTimeCodeExpiry);
-                console.log('Verification - Saved state:', {
-                    code: savedCode,
-                    expiry: savedExpiry
-                });
-                
-                if (savedCode !== code) {
-                    throw new Error(`Failed to save code. Expected: ${code}, Got: ${savedCode}`);
-                }
-                
-                // Update UI immediately
-                oneTimeCodeDisplay.textContent = code;
-                oneTimeCodeDisplay.className = 'code-display';
-                oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiryTime)}`;
-                oneTimeCodeStatus.textContent = 'Code Generated';
-                oneTimeCodeStatus.className = 'status success';
-                
-                showSuccess('New code generated successfully');
             } catch (error) {
-                console.error('Error generating one-time code:', error);
-                showError('Failed to generate code: ' + error.message);
-                oneTimeCodeStatus.textContent = 'Generation Failed';
-                oneTimeCodeStatus.className = 'status error';
+                console.error('Error generating new daily code:', error);
+                showError('Failed to generate new daily code: ' + error.message);
+                dailyCodeStatus.textContent = 'Generation Failed';
+                dailyCodeStatus.className = 'status error';
             }
         }
 
@@ -1491,7 +1491,29 @@
                 let isValid = false;
                 const keypadDisplay = document.querySelector('.keypad-display');
                 
-                if (code === currentDailyCode) {
+                // Check if it's night time before validating daily code
+                const sunResponse = await fetch(`${config.HA_URL}/api/states/sun.sun`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                
+                if (!sunResponse.ok) {
+                    throw new Error('Failed to fetch sun state');
+                }
+                
+                const sunData = await sunResponse.json();
+                const sunset = new Date(sunData.attributes.next_setting);
+                const sunrise = new Date(sunData.attributes.next_rising);
+                const now = new Date();
+                
+                // If sunset is tomorrow, get today's sunset
+                if (sunset.getDate() > now.getDate()) {
+                    sunset.setDate(sunset.getDate() - 1);
+                }
+                
+                const isNight = now >= sunset || now < sunrise;
+                
+                // Only validate daily code if it's not night time
+                if (!isNight && code === currentDailyCode) {
                     isValid = true;
                     showSuccess('Access granted - Daily Code');
                 } else if (currentOneTimeCode && code === currentOneTimeCode.code) {
@@ -1792,49 +1814,6 @@
                 lastTap = currentTime;
             });
         }
-
-        // Add event listener for debug button
-        document.addEventListener('DOMContentLoaded', function() {
-            const debugButton = document.getElementById('debugOneTimeCode');
-            if (debugButton) {
-                debugButton.addEventListener('click', debugOneTimeCode);
-            } else {
-                console.warn('Debug button not found in DOM');
-            }
-        });
-
-        // Add copy functionality
-        document.addEventListener('DOMContentLoaded', function() {
-            const copyButton = document.getElementById('copyDebug');
-            if (copyButton) {
-                copyButton.addEventListener('click', function() {
-                    const debugOutput = document.getElementById('debugOutput');
-                    const text = debugOutput.textContent;
-                    
-                    // Create a temporary textarea element
-                    const textarea = document.createElement('textarea');
-                    textarea.value = text;
-                    document.body.appendChild(textarea);
-                    
-                    // Select and copy the text
-                    textarea.select();
-                    document.execCommand('copy');
-                    
-                    // Remove the temporary element
-                    document.body.removeChild(textarea);
-                    
-                    // Show feedback
-                    const button = this;
-                    const originalText = button.innerHTML;
-                    button.innerHTML = '<span class="material-icons" style="font-size: 1em;">check</span>';
-                    setTimeout(() => {
-                        button.innerHTML = originalText;
-                    }, 2000);
-                });
-            } else {
-                console.warn('Copy button not found in DOM');
-            }
-        });
     </script>
 </body>
 </html> 

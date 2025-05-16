@@ -57,4 +57,14 @@
 - Basic lock control functionality
 - Simple status display
 - Mobile support
-- Home Assistant integration 
+- Home Assistant integration
+
+## [Unreleased]
+### Added
+- Security assessment and TODO list for system improvements
+- Comprehensive security checklist with implementation priorities
+- Documentation for planned security enhancements
+
+### Changed
+- Updated documentation to include security considerations
+- Added security-focused implementation timeline 

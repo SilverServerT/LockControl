@@ -1,0 +1,214 @@
+# Loads default set of integrations. Do not remove.
+default_config:
+
+# Load frontend themes from the themes folder
+frontend:
+  themes: !include_dir_merge_named themes
+
+# HTTP configuration
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 192.168.178.94
+
+# MQTT Configuration
+mqtt:
+  switch:
+    - name: "Magnetic Lock"
+      state_topic: "stat/tasmota/POWER"
+      command_topic: "cmnd/tasmota/POWER"
+      payload_on: "ON"
+      payload_off: "OFF"
+      state_on: "ON"
+      state_off: "OFF"
+      optimistic: false
+      qos: 1
+      retain: false
+
+# Lock Control System Configuration
+input_datetime:
+  lock_unlock_end:
+    name: "Lock Unlock End"
+    has_date: true
+    has_time: true
+  lockcontrol_daily_code_expiry:
+    name: "Lock Control Daily Code Expiry"
+    has_date: true
+    has_time: true
+  lockcontrol_one_time_code_expiry:
+    name: "Lock Control One Time Code Expiry"
+    has_date: true
+    has_time: true
+
+input_text:
+  lockcontrol_daily_code:
+    name: "Lock Control Daily Access Code"
+    max: 6
+    min: 6
+    pattern: "[0-9]*"
+    mode: text
+  lockcontrol_one_time_code:
+    name: "Lock Control One Time Access Code"
+    max: 6
+    min: 6
+    pattern: "[0-9]*"
+    mode: text
+  lockcontrol_last_opener:
+    name: "Last Door Opener"
+    max: 100
+    pattern: ".*"
+    mode: text
+  allowed_codes:
+    name: "Allowed Codes"
+    initial: "123456,654321,112233"
+
+input_boolean:
+  unlock_for_5sec:
+    name: "Unlock for 5 Seconds"
+  unlock_for_1min:
+    name: "Unlock for 1 Minute"
+  unlock_for_30min:
+    name: "Unlock for 30 Minutes"
+  unlock_for_1hr:
+    name: "Unlock for 1 Hour"
+  daily_code_enabled:
+    name: "Daily Code Enabled"
+    icon: mdi:lock
+  daily_code_used:
+    name: "Daily Code Used"
+    icon: mdi:check-circle
+
+timer:
+  door_unlock_timer:
+    name: "Door Unlock Timer"
+    duration: "01:00:00"
+
+# Version tracking sensor
+template:
+  - sensor:
+      - name: "Lock Control Version"
+        state: "2.2.0"
+        icon: mdi:information
+      - name: "Lock History"
+        state: "{{ states('input_text.lockcontrol_last_opener') }}"
+        attributes:
+          last_changed: "{{ states('input_text.lockcontrol_last_opener').last_changed }}"
+          last_updated: "{{ states('input_text.lockcontrol_last_opener').last_updated }}"
+          history: >
+            {% set history = states('input_text.lockcontrol_last_opener').attributes.get('history', []) %}
+            {% if history|length > 10 %}
+              {{ history[-10:] }}
+            {% else %}
+              {{ history }}
+            {% endif %}
+        icon: mdi:history
+
+# Include other configurations
+automation: !include automations.yaml
+script: !include scripts.yaml
+scene: !include scenes.yaml
+
+# P2000 sensors
+sensor:
+  - platform: p2000
+    scan_interval: 10
+    regios: 2
+    disciplines: Brandweerdiensten
+    name: Brandweerdiensten
+    icon: mdi:fire-truck
+    
+  - platform: p2000
+    name: Politiediensten
+    regios: 2
+    disciplines: Politiediensten
+    scan_interval: 10
+      
+  - platform: p2000
+    name: Ambulancediensten
+    regios: 2
+    disciplines: Ambulancediensten
+    scan_interval: 10
+
+  - platform: p2000
+    name: p2000
+    regios: 2
+    scan_interval: 10
+
+  - platform: p2000a
+    name: Brandweer
+    icon: mdi:fire-truck
+    regios:
+      - 7
+    diensten:
+      - 2
+
+  - platform: p2000a
+    icon: mdi:ambulance
+    name: Ambulance
+    regios:
+      - 7
+    diensten:
+      - 3
+
+  - platform: p2000a
+    icon: mdi:police-badge
+    name: Politie
+    regios:
+      - 7
+    diensten:
+      - 1
+
+  - platform: p2000a
+    icon: mdi:water-alert
+    name: KNRM
+    regios:
+      - 7
+    diensten:
+      - 4
+
+  - platform: p2000a
+    icon: mdi:sail-boat
+    name: Lifeliner
+    regios:
+      - 7
+    diensten:
+      - 5
+
+  - platform: p2000a
+    name: Friesland
+    regios:
+      - 7
+
+# Afvalbeheer configuration
+afvalbeheer:
+  - wastecollector: Omrin
+    resources:
+      - chemisch
+      - restafval
+      - groene container
+      - grofvuil
+      - papier
+      - sortibak
+      - GFT
+    postcode: 8933GC
+    streetnumber: 24
+    builtinicons: 1
+    builtiniconsnew: 1
+    upcomingsensor: 1
+    alwaysshowday: 1
+
+# Lovelace configuration
+lovelace:
+  resources:
+    - url: /hacsfiles/lovelace-mushroom/mushroom.js
+      type: module
+    - url: /hacsfiles/custom-header/custom-header.js
+      type: module
+    - url: /hacsfiles/lovelace-header-cards/lovelace-header-cards.js
+      type: module
+    - url: /hacsfiles/bar-card/bar-card.js
+      type: module
+    - url: /hacsfiles/pi-hole-card/pi-hole-card.js
+      type: module
+
+config_editor:

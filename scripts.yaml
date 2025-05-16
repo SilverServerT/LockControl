@@ -1,0 +1,47 @@
+# Access Control Scripts
+
+unlock_for_duration:
+  alias: "Unlock for Duration"
+  description: "Unlocks the door for a specified duration"
+  fields:
+    seconds:
+      description: "Duration in seconds to keep the door unlocked"
+      example: 300
+  sequence:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.magnetic_lock
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.lock_unlock_end
+      data:
+        datetime: "{{ (now() + timedelta(seconds=seconds | int)).strftime('%Y-%m-%d %H:%M:%S') }}"
+
+unlock_until_sunset:
+  alias: "Unlock until Sunset"
+  description: "Unlocks the door until sunset"
+  sequence:
+    - service: switch.turn_off
+      target:
+        entity_id: switch.magnetic_lock
+    - service: input_datetime.set_datetime
+      target:
+        entity_id: input_datetime.lock_unlock_end
+      data:
+        datetime: "{{ states('sun.sun').attributes.next_setting }}"
+
+reset_daily_code:
+  alias: "Reset Daily Code"
+  sequence:
+    - service: input_text.set_value
+      target:
+        entity_id: input_text.lockcontrol_daily_code
+      data:
+        value: "{{ range(100000, 999999) | random }}"
+    - service: input_boolean.turn_off
+      target:
+        entity_id: input_boolean.daily_code_used
+    - service: notify.access_control_notifications
+      data:
+        message: "Daily code has been reset"
+        title: "Access Control Update" 

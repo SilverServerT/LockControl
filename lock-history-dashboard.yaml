@@ -1,0 +1,24 @@
+title: Lock History
+views:
+  - title: Lock History
+    path: lock-history
+    cards:
+      - type: entities
+        title: Recent Lock Operations
+        entities:
+          - entity: input_text.lockcontrol_last_opener
+            name: Last Operation
+            icon: mdi:lock-open
+
+      - type: history-graph
+        title: Lock Operations History
+        entities:
+          - entity: input_text.lockcontrol_last_opener
+            name: Door Access History
+        hours_to_show: 24
+        refresh_interval: 60
+
+      - type: 'custom:lock-history-card'
+        entity: input_text.lockcontrol_last_opener
+        title: 'Detailed Lock History'
+        max_items: 10 

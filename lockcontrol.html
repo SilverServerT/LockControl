@@ -84,6 +84,9 @@
             text-align: center;
             margin-bottom: 20px;
             width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .header h1 {
@@ -91,6 +94,7 @@
             color: var(--primary);
             margin: 0;
             font-weight: 500;
+            text-align: center;
         }
 
         .info-bar {
@@ -128,6 +132,7 @@
         .daily-code-header {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             margin-bottom: 8px;
         }
@@ -139,6 +144,7 @@
         .daily-code-header span {
             font-weight: 500;
             color: var(--primary);
+            text-align: center;
         }
 
         .code-display {
@@ -328,13 +334,18 @@
             padding: 15px;
             border-radius: var(--radius);
             margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .friesland-header {
             display: flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
             margin-bottom: 10px;
+            width: 100%;
         }
 
         .friesland-header .material-icons {
@@ -346,6 +357,12 @@
             color: var(--primary);
         }
 
+        #brandweerNotifications, #openerHistory {
+            width: 100%;
+            max-width: 320px;
+            margin: 0 auto;
+        }
+
         .brandweer-entry {
             display: flex;
             align-items: flex-start;
@@ -354,6 +371,7 @@
             background: rgba(0,0,0,0.03);
             border-radius: 8px;
             font-size: 0.8em;
+            width: 100%;
         }
 
         .brandweer-entry .material-icons {
@@ -590,6 +608,19 @@
                 --
             </div>
         </div>
+
+        <!-- Add Opener History section -->
+        <div class="friesland-card">
+            <div class="friesland-header">
+                <span class="material-icons">history</span>
+                <span>Lock History</span>
+            </div>
+            <div id="openerHistory"></div>
+            <div id="openerTimestamp" style="text-align: center; font-size: 0.8em; color: #888; margin-top: 5px; display: flex; align-items: center; justify-content: center; gap: 4px;">
+                <span class="material-icons" style="font-size: 1em;">update</span>
+                --
+            </div>
+        </div>
     </div>
 
     <!-- Add version info -->
@@ -614,7 +645,8 @@
                 unlockEnd: "input_datetime.lock_unlock_end",
                 oneTimeCode: "input_text.lockcontrol_one_time_code",
                 oneTimeCodeExpiry: "input_datetime.lockcontrol_one_time_code_expiry",
-                version: "sensor.lockcontrol_version"
+                version: "sensor.lockcontrol_version",
+                lastOpener: "input_text.lockcontrol_last_opener"
             }
         };
 
@@ -646,7 +678,8 @@
                 return;
             }
 
-            fetch(`${config.HA_URL}/api/states/${config.stateEntities.dailyCode}`, {
+            // First check if it's night time
+            fetch(`${config.HA_URL}/api/states/sun.sun`, {
                 headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
             })
             .then(res => {
@@ -655,45 +688,72 @@
                 }
                 return res.json();
             })
-            .then(data => {
+            .then(sunData => {
+                const sunset = new Date(sunData.attributes.next_setting);
+                const sunrise = new Date(sunData.attributes.next_rising);
+                const now = new Date();
+                const isNight = now >= sunset || now < sunrise;
+
                 const dailyCode = document.getElementById('dailyCode');
                 const dailyCodeExpiry = document.getElementById('dailyCodeExpiry');
                 
-                if (data && data.state && data.state !== 'unknown') {
-                    dailyCode.textContent = data.state;
-                    
-                    fetch(`${config.HA_URL}/api/states/${config.stateEntities.dailyCodeExpiry}`, {
-                        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
-                    })
-                    .then(res => {
-                        if (!res.ok) {
-                            throw new Error(`HTTP error! status: ${res.status}`);
-                        }
-                        return res.json();
-                    })
-                    .then(expiryData => {
-                        if (expiryData && expiryData.state) {
-                            const expiry = new Date(expiryData.state);
-                            dailyCodeExpiry.textContent = `Expires at ${expiry.toLocaleTimeString('nl-NL', { 
-                                hour: '2-digit', 
-                                minute: '2-digit', 
-                                hour12: false,
-                                timeZone: config.timezone 
-                            })}`;
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error fetching expiry:', error);
-                        dailyCodeExpiry.textContent = 'Error loading expiry';
-                    });
-                } else {
-                    dailyCode.textContent = 'No code available';
-                    dailyCodeExpiry.textContent = '';
+                if (isNight) {
+                    dailyCode.textContent = 'Code disabled at night';
+                    dailyCodeExpiry.textContent = 'Available after sunrise';
+                    return;
                 }
+
+                // If it's day time, proceed with normal code update
+                fetch(`${config.HA_URL}/api/states/${config.stateEntities.dailyCode}`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                })
+                .then(res => {
+                    if (!res.ok) {
+                        throw new Error(`HTTP error! status: ${res.status}`);
+                    }
+                    return res.json();
+                })
+                .then(data => {
+                    if (data && data.state && data.state !== 'unknown') {
+                        dailyCode.textContent = data.state;
+                        
+                        fetch(`${config.HA_URL}/api/states/${config.stateEntities.dailyCodeExpiry}`, {
+                            headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                        })
+                        .then(res => {
+                            if (!res.ok) {
+                                throw new Error(`HTTP error! status: ${res.status}`);
+                            }
+                            return res.json();
+                        })
+                        .then(expiryData => {
+                            if (expiryData && expiryData.state) {
+                                const expiry = new Date(expiryData.state);
+                                dailyCodeExpiry.textContent = `Expires at ${expiry.toLocaleTimeString('nl-NL', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit', 
+                                    hour12: false,
+                                    timeZone: config.timezone 
+                                })}`;
+                            }
+                        })
+                        .catch(error => {
+                            console.error('Error fetching expiry:', error);
+                            dailyCodeExpiry.textContent = 'Error loading expiry';
+                        });
+                    } else {
+                        dailyCode.textContent = 'No code available';
+                        dailyCodeExpiry.textContent = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching daily code:', error);
+                    document.getElementById('dailyCode').textContent = 'Error loading code';
+                });
             })
             .catch(error => {
-                console.error('Error fetching daily code:', error);
-                document.getElementById('dailyCode').textContent = 'Error loading code';
+                console.error('Error checking sun state:', error);
+                document.getElementById('dailyCode').textContent = 'Error checking time';
             });
         }
 
@@ -802,6 +862,17 @@
             loadingDiv.style.display = show ? 'flex' : 'none';
         }
 
+        // Add function to record opener
+        async function recordOpener(openerType) {
+            try {
+                await callService('input_text', 'set_value', config.stateEntities.lastOpener, {
+                    value: `${openerType} at ${new Date().toLocaleString('nl-NL', { timeZone: config.timezone })}`
+                });
+            } catch (error) {
+                console.error('Error recording opener:', error);
+            }
+        }
+
         // Update toggleLock function
         async function toggleLock() {
             try {
@@ -810,6 +881,7 @@
 
                 if (currentState === 'on') {
                     await callService('switch', 'turn_off', config.tasmotaSwitch);
+                    await recordOpener('Manual Toggle');
                     currentState = 'off';
                 } else if (currentState === 'off') {
                     // Clear any active countdown when manually locking
@@ -863,14 +935,25 @@
 
                 const data = await response.json();
                 const sunset = new Date(data.attributes.next_setting);
+                const sunrise = new Date(data.attributes.next_rising);
                 const now = new Date();
+                
+                // If sunset is tomorrow, get today's sunset
+                if (sunset.getDate() > now.getDate()) {
+                    sunset.setDate(sunset.getDate() - 1);
+                }
                 
                 console.log('Current time:', now.toLocaleString());
                 console.log('Sunset time:', sunset.toLocaleString());
+                console.log('Sunrise time:', sunrise.toLocaleString());
                 console.log('Time until sunset:', Math.floor((sunset - now) / 1000 / 60), 'minutes');
+                console.log('Is after sunset?', now >= sunset);
+                console.log('Is before sunrise?', now < sunrise);
+                console.log('Is night?', now >= sunset || now < sunrise);
                 
                 // Unlock the door
                 await callService('switch', 'turn_off', config.tasmotaSwitch);
+                await recordOpener('Until Sunset');
                 currentState = 'off';
                 updateLockStatus();
                 
@@ -1123,6 +1206,7 @@
                 
                 // First unlock the door
                 await callService('switch', 'turn_off', config.tasmotaSwitch);
+                await recordOpener(`${seconds} seconds timer`);
                 currentState = 'off';
                 updateLockStatus();
 
@@ -1481,7 +1565,90 @@
             }
         }
 
-        // Update the init function to include one-time code updates
+        // Add function to update opener history
+        async function updateOpenerHistory() {
+            try {
+                if (!config.HA_TOKEN) {
+                    console.error('No token available');
+                    return;
+                }
+
+                // Get history for last 24 hours
+                const now = new Date();
+                const startTime = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+                
+                const historyResponse = await fetch(`${config.HA_URL}/api/history/period/${startTime.toISOString()}?filter_entity_id=${config.stateEntities.lastOpener}`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+
+                if (!historyResponse.ok) {
+                    throw new Error(`Failed to get history: ${historyResponse.status}`);
+                }
+
+                const historyData = await historyResponse.json();
+                const historyEntries = historyData[0] || [];
+                
+                const openerHistory = document.getElementById('openerHistory');
+                const openerTimestamp = document.getElementById('openerTimestamp');
+                
+                // Get the last 5 entries
+                const lastEntries = historyEntries.slice(-5).reverse();
+
+                // Update timestamp with current time
+                const currentTime = new Date().toLocaleTimeString('nl-NL', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false
+                });
+                openerTimestamp.innerHTML = `<span class="material-icons">update</span> ${currentTime}`;
+
+                if (lastEntries.length > 0) {
+                    // Create entries for each state
+                    const entriesHTML = lastEntries.map(entry => {
+                        const time = new Date(entry.last_changed).toLocaleTimeString('nl-NL', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
+                        
+                        return `
+                            <div class="brandweer-entry">
+                                <span class="material-icons">lock_open</span>
+                                <div class="brandweer-content">
+                                    <div>${entry.state}</div>
+                                    <div class="brandweer-time">${time}</div>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                    
+                    openerHistory.innerHTML = entriesHTML;
+                } else {
+                    openerHistory.innerHTML = `
+                        <div class="brandweer-entry">
+                            <span class="material-icons">history</span>
+                            <div class="brandweer-content">
+                                <div>No history available</div>
+                                <div class="brandweer-time">--:--</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error updating opener history:', error);
+                document.getElementById('openerHistory').innerHTML = `
+                    <div class="brandweer-entry">
+                        <span class="material-icons">error</span>
+                        <div class="brandweer-content">
+                            <div>Error loading history</div>
+                            <div class="brandweer-time">--:--</div>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        // Update init function to include opener history updates
         async function init() {
             try {
                 // First load and validate configuration
@@ -1514,6 +1681,10 @@
                 // Update weather information
                 await updateWeatherInfo();
                 setInterval(updateWeatherInfo, 300000); // Update every 5 minutes
+                
+                // Update opener history
+                await updateOpenerHistory();
+                setInterval(updateOpenerHistory, 60000); // Update every minute
                 
                 // Only update sunset time after successful initialization
                 await updateSunsetTime();
@@ -1559,6 +1730,11 @@
                 const sunrise = new Date(data.attributes.next_rising);
                 const now = new Date();
                 
+                // If sunset is tomorrow, get today's sunset
+                if (sunset.getDate() > now.getDate()) {
+                    sunset.setDate(sunset.getDate() - 1);
+                }
+                
                 // Debug information
                 console.log('=== Sunset Debug Information ===');
                 console.log('Current time:', now.toLocaleString());
@@ -1584,8 +1760,8 @@
                 
                 const sunsetBtn = document.querySelector('.duration-buttons .lock-button:last-child');
                 if (sunsetBtn) {
-                    // Only disable if it's after sunset and before next sunrise
-                    const isNight = now >= sunset || (now < sunrise && now.getHours() < 6);
+                    // Check if it's night time (between sunset and sunrise)
+                    const isNight = now >= sunset || now < sunrise;
                     if (isNight) {
                         console.log('Disabling sunset button - night time');
                         sunsetBtn.style.backgroundColor = '#888';
