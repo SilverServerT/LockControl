@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Experimental Lock Control</title>
+    <link rel="icon" href="/local/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+    <style>
+        /* Reuse existing styles from lockcontrol.html */
+        :root {
+            --primary: #1976d2;
+            --primary-dark: #1565c0;
+            --accent: #388e3c;
+            --danger: #d32f2f;
+            --bg: #f0f2f5;
+            --card-bg: #fff;
+            --shadow: 0 4px 24px rgba(0,0,0,0.08);
+            --radius: 18px;
+            --transition: 0.2s cubic-bezier(.4,0,.2,1);
+            --locked: #388e3c;
+            --unlocked: #d32f2f;
+        }
+
+        /* Add your existing styles here */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Experimental Lock Control</h1>
+            <div class="version">v2.2.0 (HA Validation)</div>
+        </div>
+
+        <!-- One-Time Code Card -->
+        <div class="card">
+            <h2>One-Time Code</h2>
+            <div id="oneTimeCode" class="code-display">Loading...</div>
+            <div id="oneTimeCodeExpiry" class="expiry"></div>
+            <div id="oneTimeCodeStatus" class="status"></div>
+            <button id="generateCode" class="button">Generate New Code</button>
+        </div>
+
+        <!-- Code Entry Card -->
+        <div class="card">
+            <h2>Enter Code</h2>
+            <div id="keypadDisplay" class="keypad-display">
+                <span class="material-icons lock-icon">lock</span>
+                Enter Code
+            </div>
+            <div class="keypad">
+                <button onclick="simulateKeyPress('1')">1</button>
+                <button onclick="simulateKeyPress('2')">2</button>
+                <button onclick="simulateKeyPress('3')">3</button>
+                <button onclick="simulateKeyPress('4')">4</button>
+                <button onclick="simulateKeyPress('5')">5</button>
+                <button onclick="simulateKeyPress('6')">6</button>
+                <button onclick="simulateKeyPress('7')">7</button>
+                <button onclick="simulateKeyPress('8')">8</button>
+                <button onclick="simulateKeyPress('9')">9</button>
+                <button onclick="simulateKeyPress('C')">C</button>
+                <button onclick="simulateKeyPress('0')">0</button>
+                <button onclick="simulateKeyPress('E')">E</button>
+            </div>
+        </div>
+
+        <!-- Status Card -->
+        <div class="card">
+            <h2>System Status</h2>
+            <div id="accessStatus" class="status">System Ready</div>
+            <div id="attemptsRemaining" class="attempts">3 attempts remaining</div>
+        </div>
+    </div>
+
+    <script>
+        // Configuration
+        const config = {
+            HA_TOKEN: '',
+            HA_URL: window.location.origin.replace('http://', 'https://'),
+            VERSION: '2.2.0',
+            timezone: 'Europe/Amsterdam',
+            tasmotaSwitch: 'switch.tasmota',
+            stateEntities: {
+                oneTimeCode: "input_text.lockcontrol_one_time_code",
+                oneTimeCodeExpiry: "input_datetime.lockcontrol_one_time_code_expiry"
+            }
+        };
+
+        // State
+        let enteredCode = '';
+        let attemptsRemaining = 3;
+        let isLockedOut = false;
+        let lockoutEndTime = null;
+
+        // Initialize the application
+        async function initializeApp() {
+            try {
+                await loadConfig();
+                await updateOneTimeCode();
+                setInterval(updateOneTimeCode, 10000); // Update every 10 seconds
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                showError('Failed to initialize app');
+            }
+        }
+
+        // Load configuration
+        async function loadConfig() {
+            try {
+                const response = await fetch('config.js');
+                if (!response.ok) throw new Error('Failed to load config');
+                const text = await response.text();
+                
+                // Extract token and URL
+                const tokenMatch = text.match(/HA_TOKEN:\s*'([^']+)'/);
+                const urlMatch = text.match(/HA_URL:\s*'([^']+)'/);
+                
+                if (tokenMatch) config.HA_TOKEN = tokenMatch[1];
+                if (urlMatch) config.HA_URL = urlMatch[1];
+                
+                if (!config.HA_TOKEN || !config.HA_URL) {
+                    throw new Error('Missing configuration values');
+                }
+            } catch (error) {
+                console.error('Error loading config:', error);
+                throw error;
+            }
+        }
+
+        // Update one-time code display
+        async function updateOneTimeCode() {
+            if (!config.HA_TOKEN) {
+                console.error('No token available');
+                document.getElementById('oneTimeCode').textContent = 'Error: No token';
+                return;
+            }
+
+            try {
+                const response = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.oneTimeCode}`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                const oneTimeCode = document.getElementById('oneTimeCode');
+                const oneTimeCodeExpiry = document.getElementById('oneTimeCodeExpiry');
+                const oneTimeCodeStatus = document.getElementById('oneTimeCodeStatus');
+                
+                if (data && data.state && data.state !== 'unknown' && data.state !== '') {
+                    oneTimeCode.textContent = data.state;
+                    
+                    const expiryResponse = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.oneTimeCodeExpiry}`, {
+                        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                    });
+                    
+                    if (expiryResponse.ok) {
+                        const expiryData = await expiryResponse.json();
+                        if (expiryData && expiryData.state) {
+                            const expiry = new Date(expiryData.state);
+                            oneTimeCodeExpiry.textContent = `Expires at ${expiry.toLocaleTimeString('nl-NL', { 
+                                hour: '2-digit', 
+                                minute: '2-digit', 
+                                hour12: false,
+                                timeZone: config.timezone 
+                            })}`;
+                            oneTimeCodeStatus.textContent = 'Code Active';
+                            oneTimeCodeStatus.className = 'status success';
+                        }
+                    }
+                } else {
+                    oneTimeCode.textContent = 'No code available';
+                    oneTimeCodeExpiry.textContent = '';
+                    oneTimeCodeStatus.textContent = 'No Active Code';
+                    oneTimeCodeStatus.className = 'status warning';
+                }
+            } catch (error) {
+                console.error('Error fetching one-time code:', error);
+                document.getElementById('oneTimeCode').textContent = 'Error loading code';
+                document.getElementById('oneTimeCodeStatus').textContent = 'Error';
+                document.getElementById('oneTimeCodeStatus').className = 'status error';
+            }
+        }
+
+        // Generate new one-time code
+        async function generateOneTimeCode(expiryMinutes = 60) {
+            try {
+                const response = await fetch(`${config.HA_URL}/api/services/event/fire`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        event_type: 'generate_one_time_code',
+                        event_data: {
+                            expiry_minutes: expiryMinutes
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate one-time code');
+                }
+
+                // Wait a moment for the automation to complete
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Update the display
+                await updateOneTimeCode();
+                
+                showSuccess('New one-time code generated');
+            } catch (error) {
+                console.error('Error generating one-time code:', error);
+                showError('Failed to generate one-time code: ' + error.message);
+            }
+        }
+
+        // Validate entered code
+        async function validateCode(code) {
+            try {
+                const response = await fetch(`${config.HA_URL}/api/services/mqtt/publish`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        topic: 'keylock/access_code',
+                        payload: code
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to validate code');
+                }
+
+                // Wait a moment for the automation to complete
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Update the display
+                await updateOneTimeCode();
+                
+                showSuccess('Code validated');
+            } catch (error) {
+                console.error('Error validating code:', error);
+                showError('Failed to validate code: ' + error.message);
+            }
+        }
+
+        // Simulate keypad press
+        function simulateKeyPress(key) {
+            const keypadDisplay = document.querySelector('.keypad-display');
+            const lockIcon = keypadDisplay.querySelector('.lock-icon');
+            
+            if (key === 'C') {
+                enteredCode = '';
+                keypadDisplay.textContent = 'Enter Code';
+                keypadDisplay.className = 'keypad-display';
+                lockIcon.textContent = 'lock';
+            } else if (key === 'E') {
+                validateCode(enteredCode);
+            } else {
+                enteredCode += key;
+                if (enteredCode.length > 8) {
+                    enteredCode = enteredCode.slice(0, 8);
+                }
+                keypadDisplay.textContent = enteredCode;
+            }
+        }
+
+        // Error handling and user feedback
+        function showError(message, duration = 5000) {
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error-message';
+            errorDiv.textContent = message;
+            document.body.appendChild(errorDiv);
+            setTimeout(() => errorDiv.remove(), duration);
+        }
+
+        function showSuccess(message, duration = 3000) {
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success-message';
+            successDiv.textContent = message;
+            document.body.appendChild(successDiv);
+            setTimeout(() => successDiv.remove(), duration);
+        }
+
+        // Event Listeners
+        document.getElementById('generateCode').addEventListener('click', () => generateOneTimeCode());
+
+        // Start the application
+        initializeApp();
+    </script>
+</body>
+</html> 

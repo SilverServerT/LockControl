@@ -301,6 +301,62 @@ automation:
         data:
           datetime: "1970-01-01 00:00:00"
 
+  - id: "validate_one_time_code"
+    alias: "Validate One-Time Code"
+    description: "Validates one-time code and manages access"
+    trigger:
+      - platform: mqtt
+        topic: "keylock/access_code"
+    condition:
+      - condition: template
+        value_template: "{{ trigger.payload == states('input_text.lockcontrol_one_time_code') }}"
+      - condition: template
+        value_template: "{{ states('input_datetime.lockcontrol_one_time_code_expiry') > now().isoformat() }}"
+    action:
+      - service: switch.turn_off
+        target:
+          entity_id: switch.tasmota
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lockcontrol_one_time_code
+        data:
+          value: ""
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lockcontrol_one_time_code_expiry
+        data:
+          datetime: "1970-01-01 00:00:00"
+      - delay: "00:00:10"
+      - service: switch.turn_on
+        target:
+          entity_id: switch.tasmota
+      - service: notify.access_control_notifications
+        data:
+          message: "Door unlocked using one-time code"
+          title: "Access Granted"
+
+  - id: "generate_one_time_code"
+    alias: "Generate One-Time Code"
+    description: "Generates a new one-time code"
+    trigger:
+      - platform: event
+        event_type: generate_one_time_code
+    action:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lockcontrol_one_time_code
+        data:
+          value: "{{ range(100000, 999999) | random }}"
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lockcontrol_one_time_code_expiry
+        data:
+          datetime: "{{ (now() + timedelta(minutes=trigger.event.data.expiry_minutes|default(60))).strftime('%Y-%m-%d %H:%M:%S') }}"
+      - service: notify.access_control_notifications
+        data:
+          message: "New one-time code has been generated"
+          title: "Access Control Update"
+
 # Script Configuration
 script:
   unlock_for_duration:

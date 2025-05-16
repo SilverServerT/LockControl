@@ -1,5 +1,240 @@
 # Access Control Automations
 
+# Core Switch Configuration
+switch:
+  - platform: mqtt
+    name: "Magnetic Lock"
+    unique_id: magnetic_lock
+    state_topic: "stat/tasmota/POWER"
+    command_topic: "cmnd/tasmota/POWER"
+    payload_on: "ON"
+    payload_off: "OFF"
+    state_on: "ON"
+    state_off: "OFF"
+    optimistic: false
+    qos: 1
+    retain: false
+
+# Input Text Configuration
+input_text:
+  - name: "Lock Control Daily Code"
+    unique_id: lockcontrol_daily_code
+    max: 8
+    min: 6
+    pattern: "[0-9]*"
+    mode: text
+  - name: "Lock Control One-Time Code"
+    unique_id: lockcontrol_one_time_code
+    max: 8
+    min: 6
+    pattern: "[0-9]*"
+    mode: text
+  - name: "Last Door Opener"
+    unique_id: lockcontrol_last_opener
+    max: 100
+    pattern: ".*"
+    mode: text
+  - name: "System Version"
+    unique_id: version
+    max: 10
+    min: 1
+    mode: text
+    initial: "2.2.0"
+
+# Input Datetime Configuration
+input_datetime:
+  - name: "Lock Unlock End"
+    unique_id: lock_unlock_end
+    has_date: true
+    has_time: true
+  - name: "Lock Control Daily Code Expiry"
+    unique_id: lockcontrol_daily_code_expiry
+    has_date: true
+    has_time: true
+  - name: "Lock Control One-Time Code Expiry"
+    unique_id: lockcontrol_one_time_code_expiry
+    has_date: true
+    has_time: true
+
+# Input Boolean Configuration
+input_boolean:
+  - name: "Daily Code Enabled"
+    unique_id: daily_code_enabled
+    icon: mdi:lock
+  - name: "Daily Code Used"
+    unique_id: daily_code_used
+    icon: mdi:check-circle
+  - name: "Unlock for 5 Seconds"
+    unique_id: unlock_for_5sec
+  - name: "Unlock for 1 Minute"
+    unique_id: unlock_for_1min
+  - name: "Unlock for 30 Minutes"
+    unique_id: unlock_for_30min
+  - name: "Unlock for 1 Hour"
+    unique_id: unlock_for_1hr
+
+# Input Number Configuration
+input_number:
+  - name: "Max Access Attempts"
+    unique_id: max_attempts
+    min: 1
+    max: 10
+    step: 1
+    mode: box
+    icon: mdi:counter
+  - name: "Lockout Duration"
+    unique_id: lockout_duration
+    min: 60
+    max: 3600
+    step: 60
+    mode: box
+    unit_of_measurement: seconds
+    icon: mdi:timer
+
+# Input Select Configuration
+input_select:
+  - name: "Access Mode"
+    unique_id: access_mode
+    options:
+      - "Normal"
+      - "Extended"
+      - "Restricted"
+    icon: mdi:clock-time-four
+
+# Lovelace Resources
+lovelace_resources:
+  - url: /hacsfiles/lovelace-card-mod/card-mod.js
+    type: module
+  - url: /hacsfiles/lovelace-auto-entities/auto-entities.js
+    type: module
+
+# Dashboard Views
+views:
+  - title: "Access Control"
+    path: access-control
+    theme: default
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: "Access Control Status"
+            theme: default
+            entities:
+              - entity: input_boolean.daily_code_enabled
+                name: "Daily Code System"
+                icon: mdi:lock
+              - entity: input_boolean.daily_code_used
+                name: "Daily Code Status"
+                icon: mdi:check-circle
+              - entity: input_text.lockcontrol_daily_code
+                name: "Current Daily Code"
+                icon: mdi:key
+              - entity: input_datetime.lockcontrol_daily_code_expiry
+                name: "Code Expiry"
+                icon: mdi:clock-outline
+              - entity: input_text.lockcontrol_one_time_code
+                name: "One-Time Code"
+                icon: mdi:vpn-key
+              - entity: input_datetime.lockcontrol_one_time_code_expiry
+                name: "One-Time Code Expiry"
+                icon: mdi:clock-outline
+
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: "Reset Daily Code"
+                icon: mdi:refresh
+                tap_action:
+                  action: call-service
+                  service: script.reset_daily_code
+                entity: script.reset_daily_code
+                show_state: false
+
+              - type: button
+                name: "Toggle Daily Code System"
+                icon: mdi:power
+                tap_action:
+                  action: call-service
+                  service: input_boolean.toggle
+                  target:
+                    entity_id: input_boolean.daily_code_enabled
+                entity: input_boolean.daily_code_enabled
+                show_state: true
+
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: "Unlock 5s"
+                icon: mdi:lock-open
+                tap_action:
+                  action: call-service
+                  service: script.unlock_for_duration
+                  data:
+                    seconds: 5
+                entity: input_boolean.unlock_for_5sec
+                show_state: false
+
+              - type: button
+                name: "Unlock 1m"
+                icon: mdi:lock-open
+                tap_action:
+                  action: call-service
+                  service: script.unlock_for_duration
+                  data:
+                    seconds: 60
+                entity: input_boolean.unlock_for_1min
+                show_state: false
+
+              - type: button
+                name: "Unlock 30m"
+                icon: mdi:lock-open
+                tap_action:
+                  action: call-service
+                  service: script.unlock_for_duration
+                  data:
+                    seconds: 1800
+                entity: input_boolean.unlock_for_30min
+                show_state: false
+
+              - type: button
+                name: "Unlock 1h"
+                icon: mdi:lock-open
+                tap_action:
+                  action: call-service
+                  service: script.unlock_for_duration
+                  data:
+                    seconds: 3600
+                entity: input_boolean.unlock_for_1hr
+                show_state: false
+
+          - type: markdown
+            title: "Access Control Information"
+            content: >
+              ### Daily Code System
+              * A new 6-digit code is generated at midnight
+              * Each code can only be used once per day
+              * The door unlocks for 10 seconds when a valid code is entered
+              * Notifications are sent for all access events
+
+          - type: history-graph
+            title: "Access History"
+            entities:
+              - entity: input_boolean.daily_code_used
+              - entity: switch.magnetic_lock
+            hours_to_show: 24
+
+          - type: entities
+            title: "System Status"
+            entities:
+              - entity: input_text.version
+                name: "System Version"
+              - entity: input_number.max_attempts
+                name: "Max Access Attempts"
+              - entity: input_number.lockout_duration
+                name: "Lockout Duration"
+              - entity: input_select.access_mode
+                name: "Access Mode"
+
 - id: "initialize_lock_timer"
   alias: "Initialize Lock Timer"
   description: "Initialize the lock timer on startup"

@@ -1565,6 +1565,72 @@
             }
         }
 
+        // Function to generate a new one-time code
+        async function generateOneTimeCode(expiryMinutes = 60) {
+            try {
+                const response = await fetch(`${config.HA_URL}/api/services/event/fire`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        event_type: 'generate_one_time_code',
+                        event_data: {
+                            expiry_minutes: expiryMinutes
+                        }
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to generate one-time code');
+                }
+
+                // Wait a moment for the automation to complete
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Update the display
+                await updateOneTimeCode();
+                
+                showSuccess('New one-time code generated');
+            } catch (error) {
+                console.error('Error generating one-time code:', error);
+                showError('Failed to generate one-time code: ' + error.message);
+            }
+        }
+
+        // Function to validate a code
+        async function validateCode(code) {
+            try {
+                const response = await fetch(`${config.HA_URL}/api/services/mqtt/publish`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        topic: 'keylock/access_code',
+                        payload: code
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to validate code');
+                }
+
+                // Wait a moment for the automation to complete
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                // Update the display
+                await updateOneTimeCode();
+                
+                showSuccess('Code validated');
+            } catch (error) {
+                console.error('Error validating code:', error);
+                showError('Failed to validate code: ' + error.message);
+            }
+        }
+
         // Add function to update opener history
         async function updateOpenerHistory() {
             try {
