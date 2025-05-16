@@ -33,7 +33,6 @@
             -webkit-user-select: none;
             user-select: none;
             overscroll-behavior: none;
-            overflow-y: auto;
         }
 
         .container {
@@ -50,7 +49,6 @@
             box-sizing: border-box;
             transition: border-color 0.3s;
             border: 4px solid #bbb;
-            overflow-y: auto;
         }
 
         .container.locked {
@@ -198,9 +196,9 @@
                 max-width: 100%;
                 margin: 0;
                 padding: 15px;
-                min-height: auto;
-                height: auto;
-                overflow-y: visible;
+                min-height: 100vh;
+                height: 100vh;
+                overflow: hidden;
             }
 
             .header h1 {
@@ -1104,13 +1102,28 @@
         // Update Friesland sensor function
         async function updateFrieslandSensor() {
             try {
-                console.log('=== Brandweer Debug Info ===');
+                // First get current state
+                const response = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.friesland}`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
                 
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const currentData = await response.json();
+                const brandweerNotifications = document.getElementById('brandweerNotifications');
+                const brandweerTimestamp = document.getElementById('brandweerTimestamp');
+                const timestamp = new Date().toLocaleTimeString('nl-NL', { 
+                    hour: '2-digit', 
+                    minute: '2-digit',
+                    hour12: false,
+                    timeZone: config.timezone 
+                });
+
                 // Get history for last 24 hours
                 const now = new Date();
                 const startTime = new Date(now.getTime() - (24 * 60 * 60 * 1000));
-                console.log('Fetching history from:', startTime.toISOString());
-                
                 const historyResponse = await fetch(`${config.HA_URL}/api/history/period/${startTime.toISOString()}?filter_entity_id=${config.stateEntities.friesland}`, {
                     headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
                 });
@@ -1120,63 +1133,28 @@
                 }
 
                 const historyData = await historyResponse.json();
-                console.log('History data:', historyData);
-                
                 const historyEntries = historyData[0] || [];
-                console.log('History entries:', historyEntries);
 
-                const brandweerNotifications = document.getElementById('brandweerNotifications');
-                const brandweerTimestamp = document.getElementById('brandweerTimestamp');
-                
-                // Get the last 3 entries
-                const lastEntries = historyEntries.slice(-3).reverse();
-                console.log('Last 3 entries:', lastEntries);
+                // Update timestamp
+                brandweerTimestamp.innerHTML = `<span class="material-icons">update</span> ${timestamp}`;
 
-                // Update timestamp with current time
-                const currentTime = new Date().toLocaleTimeString('nl-NL', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                    hour12: false,
-                    timeZone: config.timezone
-                });
-                brandweerTimestamp.innerHTML = `<span class="material-icons">update</span> ${currentTime}`;
-
-                if (lastEntries.length > 0) {
-                    // Create entries for each state
+                if (historyEntries.length > 0) {
+                    // Get last 3 entries
+                    const lastEntries = historyEntries.slice(-3).reverse();
+                    
+                    // Create entries
                     const entriesHTML = lastEntries.map(entry => {
-                        console.log('Processing entry:', entry);
-                        
-                        // Format the message
-                        let message = entry.state;
-                        
-                        // Add priority if it starts with P
-                        if (message.startsWith('P')) {
-                            const priority = message.split(' ')[0];
-                            message = message.replace(priority, `<strong>${priority}</strong>`);
-                        }
-                        
-                        // Add location if it contains a city name
-                        const cities = ['Drachten', 'Leeuwarden', 'Sneek', 'Heerenveen', 'Bolsward'];
-                        for (const city of cities) {
-                            if (message.includes(city)) {
-                                message = message.replace(city, `<strong>${city}</strong>`);
-                                break;
-                            }
-                        }
-
-                        // Get the time from the tijd attribute
-                        const time = entry.attributes?.tijd || '--:--';
-                        console.log('Entry time:', {
-                            tijd: entry.attributes?.tijd,
-                            state: entry.state,
-                            last_changed: entry.last_changed
+                        const time = new Date(entry.last_updated).toLocaleTimeString('nl-NL', {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false,
+                            timeZone: config.timezone
                         });
-                        
                         return `
                             <div class="brandweer-entry">
                                 <span class="material-icons">warning</span>
                                 <div class="brandweer-content">
-                                    <div>${message}</div>
+                                    <div>${entry.state || 'Brandweer alert'}</div>
                                     <div class="brandweer-time">${time}</div>
                                 </div>
                             </div>
@@ -1185,8 +1163,8 @@
                     
                     brandweerNotifications.innerHTML = entriesHTML;
                     
-                    // Show warning if the most recent state indicates active alert
-                    if (lastEntries[0].state !== 'none') {
+                    // Show warning if current state indicates active alert
+                    if (currentData && currentData.state && currentData.state !== 'none') {
                         showError('Brandweer sensor is active!');
                     }
                 } else {
@@ -1195,7 +1173,7 @@
                             <span class="material-icons">check_circle</span>
                             <div class="brandweer-content">
                                 <div>No active alerts</div>
-                                <div class="brandweer-time">${currentTime}</div>
+                                <div class="brandweer-time">${timestamp}</div>
                             </div>
                         </div>
                     `;
@@ -1207,7 +1185,12 @@
                         <span class="material-icons">error</span>
                         <div class="brandweer-content">
                             <div>Error loading data</div>
-                            <div class="brandweer-time">--:--</div>
+                            <div class="brandweer-time">${new Date().toLocaleTimeString('nl-NL', {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                                timeZone: config.timezone
+                            })}</div>
                         </div>
                     </div>
                 `;
