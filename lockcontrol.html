@@ -410,6 +410,56 @@
                 margin-top: 0.3em;
             }
         }
+
+        .sun-info {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            min-width: 80px;
+        }
+
+        .sun-times {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-size: 0.9em;
+            color: #444;
+            line-height: 1.2;
+        }
+
+        .sun-time {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            white-space: nowrap;
+        }
+
+        .sun-time .material-icons {
+            color: #ff9800;
+            font-size: 1.1em;
+        }
+
+        #sunIcon {
+            color: #ff9800;
+            animation: sunPulse 2s infinite;
+            font-size: 1.3em;
+        }
+
+        @keyframes sunPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); }
+        }
+
+        @media (max-width: 600px) {
+            .sun-times {
+                font-size: 0.8em;
+            }
+            .sun-info {
+                min-width: 70px;
+            }
+        }
     </style>
 </head>
 <body>
@@ -462,7 +512,20 @@
             </div>
             <div class="info-item">
                 <span class="material-icons">wb_sunny</span>
-                <span id="sunsetTime">--:--</span>
+                <span id="weatherInfo">--</span>
+            </div>
+            <div class="info-item sun-info">
+                <span class="material-icons" id="sunIcon">wb_sunny</span>
+                <div class="sun-times">
+                    <div class="sun-time">
+                        <span class="material-icons" style="font-size: 0.9em;">nightlight_round</span>
+                        <span id="sunsetTime">--:--</span>
+                    </div>
+                    <div class="sun-time">
+                        <span class="material-icons" style="font-size: 0.9em;">wb_twilight</span>
+                        <span id="sunriseTime">--:--</span>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -768,37 +831,37 @@
         // Load configuration from config file
         async function loadConfig() {
             try {
-                console.log('Device info:', {
-                    userAgent: navigator.userAgent,
-                    platform: navigator.platform,
-                    isMobile: /iPhone|iPad|iPod|Android/i.test(navigator.userAgent)
-                });
-
-                // Add cache-busting parameter and force reload
+                console.log('Starting config load...');
+                
+                // Add cache-busting parameter
                 const timestamp = new Date().getTime();
+                const baseUrl = window.location.origin;
                 const configPaths = [
+                    `${baseUrl}/local/lockcontrol/config.js?t=${timestamp}`,
+                    `${baseUrl}/local/config.js?t=${timestamp}`,
                     `config.js?t=${timestamp}`,
-                    `../config.js?t=${timestamp}`,
-                    '/local/lockcontrol/config.js?t=' + timestamp,
-                    '/local/config.js?t=' + timestamp
+                    `../config.js?t=${timestamp}`
                 ];
+
+                console.log('Trying config paths:', configPaths);
 
                 let configLoaded = false;
                 for (const path of configPaths) {
                     try {
-                        console.log('Trying to load config from:', path);
+                        console.log('Attempting to load config from:', path);
                         const response = await fetch(path, {
                             method: 'GET',
                             headers: {
                                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                                 'Pragma': 'no-cache',
                                 'Expires': '0'
-                            }
+                            },
+                            credentials: 'same-origin'
                         });
                         
                         if (response.ok) {
                             const text = await response.text();
-                            console.log('Successfully loaded config from:', path);
+                            console.log('Config file loaded successfully from:', path);
                             
                             // Try to find token in JavaScript format first
                             let match = text.match(/HA_TOKEN:\s*'([^']+)'/);
@@ -817,6 +880,8 @@
                                 } catch (e) {
                                     console.warn('Could not store token in localStorage:', e);
                                 }
+                            } else {
+                                console.warn('No token found in config file');
                             }
 
                             // Try to find URL in JavaScript format first
@@ -836,13 +901,17 @@
                                 } catch (e) {
                                     console.warn('Could not store URL in localStorage:', e);
                                 }
+                            } else {
+                                console.warn('No URL found in config file');
                             }
                             
                             configLoaded = true;
                             break;
+                        } else {
+                            console.warn(`Failed to load config from ${path}: ${response.status} ${response.statusText}`);
                         }
                     } catch (e) {
-                        console.warn(`Failed to load config from ${path}:`, e);
+                        console.warn(`Error loading config from ${path}:`, e);
                     }
                 }
 
@@ -868,6 +937,12 @@
 
                 // Verify we have the required values
                 if (!config.HA_TOKEN || !config.HA_URL) {
+                    console.error('Missing configuration values:', {
+                        hasToken: !!config.HA_TOKEN,
+                        hasUrl: !!config.HA_URL,
+                        tokenLength: config.HA_TOKEN?.length,
+                        url: config.HA_URL
+                    });
                     throw new Error('Missing required configuration values');
                 }
 
@@ -877,10 +952,23 @@
                     tokenLength: config.HA_TOKEN.length
                 });
 
+                // Verify token is valid by making a test request
+                try {
+                    const testResponse = await fetch(`${config.HA_URL}/api/`, {
+                        headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                    });
+                    if (!testResponse.ok) {
+                        throw new Error(`Token validation failed: ${testResponse.status}`);
+                    }
+                    console.log('Token validation successful');
+                } catch (error) {
+                    console.error('Token validation failed:', error);
+                    throw new Error('Invalid token');
+                }
+
             } catch (error) {
                 console.error('Error loading config:', error);
-                document.getElementById('dailyCode').textContent = 'Error: Config not loaded';
-                document.getElementById('lockStatusText').textContent = 'Error: Config not loaded';
+                showError('Failed to load configuration. Please check your config file and try clearing your browser cache.');
                 throw error;
             }
         }
@@ -978,8 +1066,8 @@
                 setDurationButtonsEnabled(false);
                 showLoading(true);
 
-                // Get sunset time
-                const response = await fetch(`${config.HA_URL}/api/states/sun.sun`, {
+                // Get sunset time from template sensor
+                const response = await fetch(`${config.HA_URL}/api/states/sensor.next_sunset`, {
                     headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
                 });
                 
@@ -988,7 +1076,7 @@
                 }
                 
                 const data = await response.json();
-                const sunset = new Date(data.attributes.next_setting);
+                const sunset = new Date(data.state);
                 
                 // First unlock the door
                 await fetch(`${config.HA_URL}/api/services/switch/turn_off`, {
@@ -1268,30 +1356,166 @@
             }
         }
 
-        // Update the init function to include countdown timer updates
+        // Add this function to update weather information
+        async function updateWeatherInfo() {
+            try {
+                if (!config.HA_TOKEN) {
+                    console.error('No authentication token available');
+                    document.getElementById('weatherInfo').textContent = '--';
+                    return;
+                }
+
+                const response = await fetch(`${config.HA_URL}/api/states/weather.forecast_home`, {
+                    headers: { 
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch weather data: ${response.status}`);
+                }
+
+                const data = await response.json();
+                if (data && data.state && data.attributes) {
+                    const temp = data.attributes.temperature;
+                    const condition = data.state;
+                    document.getElementById('weatherInfo').textContent = `${condition}, ${temp}°C`;
+                } else {
+                    document.getElementById('weatherInfo').textContent = '--';
+                }
+            } catch (error) {
+                console.error('Error updating weather info:', error);
+                document.getElementById('weatherInfo').textContent = '--';
+            }
+        }
+
+        // Update the init function to include weather updates
         async function init() {
             try {
+                // First load and validate configuration
                 await loadConfig();
+                
+                // Update date/time display
                 updateDateTime();
                 setInterval(updateDateTime, 1000);
+                
+                // Update daily code
                 updateDailyCode();
                 setInterval(updateDailyCode, 60000);
+                
+                // Update Friesland sensor
                 updateFrieslandSensor();
                 setInterval(updateFrieslandSensor, 300000); // Update every 5 minutes
-                getLockState();
+                
+                // Get initial lock state
+                await getLockState();
                 setInterval(getLockState, 30000);
+                
                 // Add countdown timer updates
                 updateCountdownTimer();
                 setInterval(updateCountdownTimer, 1000); // Update every second
+                
+                // Update weather information
+                await updateWeatherInfo();
+                setInterval(updateWeatherInfo, 300000); // Update every 5 minutes
+                
+                // Only update sunset time after successful initialization
+                await updateSunsetTime();
+                setInterval(updateSunsetTime, 3600000); // Update every hour
+                
+                console.log('Initialization complete');
             } catch (error) {
                 console.error('Error initializing:', error);
-                document.getElementById('dailyCode').textContent = 'Error: Initialization failed';
-                document.getElementById('lockStatusText').textContent = 'Error: Initialization failed';
+                showError('Failed to initialize. Please check your configuration and try again.');
             }
         }
 
         // Start the application
         init();
+
+        // Update the updateSunsetTime function
+        async function updateSunsetTime() {
+            try {
+                // First verify we have a valid token
+                if (!config.HA_TOKEN) {
+                    console.error('No authentication token available');
+                    document.getElementById('sunsetTime').textContent = '--:--';
+                    document.getElementById('sunriseTime').textContent = '--:--';
+                    return;
+                }
+
+                const response = await fetch(`${config.HA_URL}/api/states/sun.sun`, {
+                    headers: { 
+                        'Authorization': `Bearer ${config.HA_TOKEN}`,
+                        'Cache-Control': 'no-cache, no-store, must-revalidate',
+                        'Pragma': 'no-cache'
+                    }
+                });
+                
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        console.error('Authentication failed - token may be invalid or expired');
+                        showError('Authentication failed. Please check your token.');
+                    } else {
+                        console.error('Failed to fetch sun data:', response.status, response.statusText);
+                    }
+                    document.getElementById('sunsetTime').textContent = '--:--';
+                    document.getElementById('sunriseTime').textContent = '--:--';
+                    return;
+                }
+                
+                const data = await response.json();
+                const sunset = new Date(data.attributes.next_setting);
+                const sunrise = new Date(data.attributes.next_rising);
+                const now = new Date();
+                
+                // Update sunset and sunrise times with proper formatting
+                document.getElementById('sunsetTime').textContent = formatTime(sunset);
+                document.getElementById('sunriseTime').textContent = formatTime(sunrise);
+                
+                // Update sun icon based on time of day
+                const sunIcon = document.getElementById('sunIcon');
+                if (now >= sunset || now < sunrise) {
+                    sunIcon.textContent = 'nightlight_round';
+                    sunIcon.style.color = '#64b5f6';
+                } else {
+                    sunIcon.textContent = 'wb_sunny';
+                    sunIcon.style.color = '#ff9800';
+                }
+                
+                // Update sunset button text
+                const sunsetBtn = document.querySelector('.duration-buttons .lock-button:last-child');
+                if (sunsetBtn) {
+                    if (now >= sunset || now < sunrise) {
+                        sunsetBtn.style.backgroundColor = '#888';
+                        sunsetBtn.style.cursor = 'not-allowed';
+                        sunsetBtn.textContent = 'Not available at night';
+                        sunsetBtn.disabled = true;
+                    } else {
+                        sunsetBtn.style.backgroundColor = '';
+                        sunsetBtn.style.cursor = '';
+                        sunsetBtn.textContent = `Until ${formatTime(sunset)}`;
+                        sunsetBtn.disabled = false;
+                    }
+                }
+            } catch (error) {
+                console.error('Error updating sun times:', error);
+                document.getElementById('sunsetTime').textContent = '--:--';
+                document.getElementById('sunriseTime').textContent = '--:--';
+            }
+        }
+
+        // Update the formatTime function to handle timezone
+        function formatTime(date) {
+            return date.toLocaleTimeString('nl-NL', { 
+                hour: '2-digit', 
+                minute: '2-digit', 
+                hour12: false,
+                timeZone: config.timezone 
+            });
+        }
     </script>
 </body>
 </html>

@@ -30,6 +30,30 @@ sun:
     elevation: 0
     azimuth: 0
 
+# Template Sensors for Sun Times
+sensor:
+  - platform: template
+    sensors:
+      next_sunset:
+        friendly_name: "Next Sunset"
+        value_template: "{{ states('sun.sun').attributes.next_setting }}"
+        device_class: timestamp
+      next_sunrise:
+        friendly_name: "Next Sunrise"
+        value_template: "{{ states('sun.sun').attributes.next_rising }}"
+        device_class: timestamp
+      sun_state:
+        friendly_name: "Sun State"
+        value_template: "{{ states('sun.sun').state }}"
+      sun_elevation:
+        friendly_name: "Sun Elevation"
+        value_template: "{{ states('sun.sun').attributes.elevation }}"
+        unit_of_measurement: "°"
+      sun_azimuth:
+        friendly_name: "Sun Azimuth"
+        value_template: "{{ states('sun.sun').attributes.azimuth }}"
+        unit_of_measurement: "°"
+
 # Brandweer Notifications
 sensor:
   friesland:
@@ -103,7 +127,6 @@ input_datetime:
     name: "Lock Unlock End"
     has_date: true
     has_time: true
-    initial: "{{ now().strftime('%Y-%m-%d %H:%M:%S') }}"
   lockcontrol_daily_code_expiry:
     name: "Lock Control Daily Code Expiry"
     has_date: true
@@ -275,6 +298,27 @@ automation:
         data:
           datetime: "1970-01-01 00:00:00"
 
+  - id: "lock_at_sunset"
+    alias: "Lock at Sunset"
+    description: "Locks the door when the timer expires"
+    trigger:
+      - platform: state
+        entity_id: input_datetime.lock_unlock_end
+    condition:
+      - condition: template
+        value_template: "{{ states('input_datetime.lock_unlock_end') != '1970-01-01 00:00:00' }}"
+      - condition: template
+        value_template: "{{ now() >= states('input_datetime.lock_unlock_end') | as_datetime }}"
+    action:
+      - service: switch.turn_on
+        target:
+          entity_id: switch.tasmota
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lock_unlock_end
+        data:
+          datetime: "1970-01-01 00:00:00"
+
 # Script Configuration
 script:
   unlock_for_duration:
@@ -415,6 +459,26 @@ views:
                 name: "Max Access Attempts"
               - entity: input_number.lockout_duration
                 name: "Lockout Duration"
+
+          - type: entities
+            title: "Sun Information"
+            theme: default
+            entities:
+              - entity: sensor.next_sunset
+                name: "Next Sunset"
+                icon: mdi:weather-sunset
+              - entity: sensor.next_sunrise
+                name: "Next Sunrise"
+                icon: mdi:weather-sunrise
+              - entity: sensor.sun_state
+                name: "Sun State"
+                icon: mdi:white-balance-sunny
+              - entity: sensor.sun_elevation
+                name: "Sun Elevation"
+                icon: mdi:angle-acute
+              - entity: sensor.sun_azimuth
+                name: "Sun Azimuth"
+                icon: mdi:compass
 
 # Add Custom UI Elements
 
