@@ -1,5 +1,5 @@
 # Advanced Wiegand Access Control System
-# Version 2.0.0
+# Version 2.1.0
 
 # Core Switch Configuration
 switch:
@@ -62,7 +62,14 @@ input_text:
     max: 10
     min: 1
     mode: text
-    initial: "2.0.0"
+    initial: "2.1.0"
+
+  version_lockcontrol:
+    name: "Lock Control Version"
+    max: 10
+    min: 1
+    mode: text
+    initial: "2.1.0"
 
 # Input Number Configuration
 input_number:
@@ -111,6 +118,9 @@ input_boolean:
   daily_code_enabled:
     name: "Daily Code Enabled"
     icon: mdi:lock
+  daily_code_used:
+    name: "Daily Code Used"
+    icon: mdi:check-circle
 
 # Input Select Configuration
 input_select:
@@ -158,46 +168,253 @@ automation:
         target:
           entity_id: switch.tasmota
 
-  - id: "reset_daily_code"
-    alias: "Reset Daily Code at Midnight"
-    description: "Resets the daily access code at midnight"
+  - id: "generate_daily_code"
+    alias: "Generate Daily Code"
+    description: "Generates a new daily code at midnight"
     trigger:
       - platform: time
         at: "00:00:00"
     action:
       - service: input_text.set_value
         target:
-          entity_id: input_text.daily_code
+          entity_id: input_text.lockcontrol_daily_code
         data:
-          value: "{{ states('input_text.daily_code') }}"
+          value: "{{ range(100000, 999999) | random }}"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.daily_code_used
+      - service: notify.access_control_notifications
+        data:
+          message: "New daily code has been generated"
+          title: "Access Control Update"
+
+  - id: "validate_daily_code"
+    alias: "Validate Daily Code"
+    description: "Validates the daily code and manages access"
+    trigger:
+      - platform: mqtt
+        topic: "keylock/access_code"
+    condition:
+      - condition: state
+        entity_id: input_boolean.daily_code_enabled
+        state: "on"
+      - condition: template
+        value_template: "{{ trigger.payload == states('input_text.lockcontrol_daily_code') }}"
+      - condition: state
+        entity_id: input_boolean.daily_code_used
+        state: "off"
+    action:
+      - service: input_boolean.turn_on
+        target:
+          entity_id: input_boolean.daily_code_used
+      - service: switch.turn_off
+        target:
+          entity_id: switch.tasmota
+      - delay: "00:00:10"
+      - service: switch.turn_on
+        target:
+          entity_id: switch.tasmota
+      - service: notify.access_control_notifications
+        data:
+          message: "Door unlocked using daily code"
+          title: "Access Granted"
+
+  - id: "notify_daily_code_usage"
+    alias: "Notify Daily Code Usage"
+    description: "Notifies when daily code is used"
+    trigger:
+      - platform: state
+        entity_id: input_boolean.daily_code_used
+        to: "on"
+    action:
+      - service: notify.access_control_notifications
+        data:
+          message: "Daily code has been used. New code will be generated at midnight."
+          title: "Daily Code Status"
+
+  - id: "auto_relock_after_duration"
+    alias: "Auto Re-Lock After Timed Unlock"
+    description: "Automatically locks the door when the unlock timer expires"
+    trigger:
+      - platform: template
+        value_template: >
+          {{ now().timestamp() | int >= as_timestamp(states('input_datetime.lock_unlock_end')) | int
+             and states('switch.tasmota') == 'off'
+             and states('input_datetime.lock_unlock_end') != '1970-01-01 00:00:00' }}
+    action:
+      # Lock the door
+      - service: switch.turn_on
+        target:
+          entity_id: switch.tasmota
+      # Reset the unlock timer
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lock_unlock_end
+        data:
+          datetime: "1970-01-01 00:00:00"
+      # Notify that the door has been locked
+      - service: notify.access_control_notifications
+        data:
+          message: "Door has been automatically locked after timed unlock"
+          title: "Door Locked"
+
+  - id: "cancel_timed_unlock_on_manual_lock"
+    alias: "Cancel Timed Unlock on Manual Lock"
+    description: "Cancels any timed unlock when the door is manually locked"
+    trigger:
+      - platform: state
+        entity_id: switch.tasmota
+        to: "on"
+    condition:
+      - condition: template
+        value_template: "{{ states('input_datetime.lock_unlock_end') != '1970-01-01 00:00:00' }}"
+    action:
+      - service: input_datetime.set_datetime
+        target:
+          entity_id: input_datetime.lock_unlock_end
+        data:
+          datetime: "1970-01-01 00:00:00"
 
 # Script Configuration
 script:
   unlock_for_duration:
     alias: "Unlock for Duration"
+    description: "Unlocks the door for a specified duration"
+    fields:
+      seconds:
+        description: "Duration in seconds to keep the door unlocked"
+        example: 300
     sequence:
+      # First unlock the door
       - service: switch.turn_off
         target:
           entity_id: switch.tasmota
+      # Set the unlock end time
       - service: input_datetime.set_datetime
         target:
           entity_id: input_datetime.lock_unlock_end
         data:
-          datetime: "{{ now() + timedelta(seconds=seconds) }}"
+          datetime: "{{ (now() + timedelta(seconds=seconds | int)).strftime('%Y-%m-%d %H:%M:%S') }}"
 
   unlock_until_sunset:
     alias: "Unlock until Sunset"
+    description: "Unlocks the door until sunset"
     sequence:
+      # First unlock the door
       - service: switch.turn_off
         target:
           entity_id: switch.tasmota
+      # Set the unlock end time to sunset
       - service: input_datetime.set_datetime
         target:
           entity_id: input_datetime.lock_unlock_end
         data:
           datetime: "{{ states('sun.sun').attributes.next_setting }}"
 
+  reset_daily_code:
+    alias: "Reset Daily Code"
+    sequence:
+      - service: input_text.set_value
+        target:
+          entity_id: input_text.lockcontrol_daily_code
+        data:
+          value: "{{ range(100000, 999999) | random }}"
+      - service: input_boolean.turn_off
+        target:
+          entity_id: input_boolean.daily_code_used
+      - service: notify.access_control_notifications
+        data:
+          message: "Daily code has been reset"
+          title: "Access Control Update"
+
 # Notification Configuration
 notify:
   - platform: homeassistant
     name: "Access Control Notifications"
+
+# Add Lovelace Dashboard Configuration
+lovelace:
+  mode: yaml
+  resources:
+    - url: /hacsfiles/lovelace-card-mod/card-mod.js
+      type: module
+    - url: /hacsfiles/lovelace-auto-entities/auto-entities.js
+      type: module
+
+# Add Dashboard Views
+views:
+  - title: "Access Control"
+    path: access-control
+    theme: default
+    cards:
+      - type: vertical-stack
+        cards:
+          - type: entities
+            title: "Access Control Status"
+            theme: default
+            entities:
+              - entity: input_boolean.daily_code_enabled
+                name: "Daily Code System"
+                icon: mdi:lock
+              - entity: input_boolean.daily_code_used
+                name: "Daily Code Status"
+                icon: mdi:check-circle
+              - entity: input_text.lockcontrol_daily_code
+                name: "Current Daily Code"
+                icon: mdi:key
+              - entity: input_datetime.lockcontrol_daily_code_expiry
+                name: "Code Expiry"
+                icon: mdi:clock-outline
+
+          - type: horizontal-stack
+            cards:
+              - type: button
+                name: "Reset Daily Code"
+                icon: mdi:refresh
+                tap_action:
+                  action: call-service
+                  service: script.reset_daily_code
+                entity: script.reset_daily_code
+                show_state: false
+
+              - type: button
+                name: "Toggle Daily Code System"
+                icon: mdi:power
+                tap_action:
+                  action: call-service
+                  service: input_boolean.toggle
+                  target:
+                    entity_id: input_boolean.daily_code_enabled
+                entity: input_boolean.daily_code_enabled
+                show_state: true
+
+          - type: markdown
+            title: "Access Control Information"
+            content: >
+              ### Daily Code System
+              * A new 6-digit code is generated at midnight
+              * Each code can only be used once per day
+              * The door unlocks for 10 seconds when a valid code is entered
+              * Notifications are sent for all access events
+
+          - type: history-graph
+            title: "Access History"
+            entities:
+              - entity: input_boolean.daily_code_used
+              - entity: switch.tasmota
+            hours_to_show: 24
+
+          - type: entities
+            title: "System Status"
+            entities:
+              - entity: input_text.version
+                name: "System Version"
+              - entity: input_text.version_lockcontrol
+                name: "Lock Control Version"
+              - entity: input_number.max_attempts
+                name: "Max Access Attempts"
+              - entity: input_number.lockout_duration
+                name: "Lockout Duration"
+
+# Add Custom UI Elements
+

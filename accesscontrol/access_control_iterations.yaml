@@ -1,0 +1,87 @@
+# Input entities for Lock Control
+input_text:
+  lockcontrol_daily_code:
+    name: "Lock Control Daily Code"
+    max: 8
+    min: 6
+    pattern: "[0-9]*"
+    mode: text
+
+  lockcontrol_one_time_code:
+    name: "Lock Control One-Time Code"
+    max: 8
+    min: 8
+    pattern: "[0-9]*"
+    mode: text
+
+input_datetime:
+  lockcontrol_daily_code_expiry:
+    name: "Lock Control Daily Code Expiry"
+    has_date: true
+    has_time: true
+
+  lockcontrol_one_time_code_expiry:
+    name: "Lock Control One-Time Code Expiry"
+    has_date: true
+    has_time: true
+
+# Version tracking
+input_text:
+  version:
+    name: "Lock Control Version"
+    max: 10
+    mode: text
+
+# Automation to clear expired codes
+automation:
+  - alias: "Clear Expired Lock Control Codes"
+    trigger:
+      - platform: time_pattern
+        minutes: "/5"  # Check every 5 minutes
+    action:
+      - choose:
+          - conditions:
+              - condition: template
+                value_template: "{{ states('input_datetime.lockcontrol_one_time_code_expiry') < now().isoformat() }}"
+            sequence:
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.lockcontrol_one_time_code
+                data:
+                  value: ""
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.lockcontrol_one_time_code_expiry
+                data:
+                  datetime: "1970-01-01 00:00:00"
+          - conditions:
+              - condition: template
+                value_template: "{{ states('input_datetime.lockcontrol_daily_code_expiry') < now().isoformat() }}"
+            sequence:
+              - service: input_text.set_value
+                target:
+                  entity_id: input_text.lockcontrol_daily_code
+                data:
+                  value: ""
+              - service: input_datetime.set_datetime
+                target:
+                  entity_id: input_datetime.lockcontrol_daily_code_expiry
+                data:
+                  datetime: "1970-01-01 00:00:00"
+
+# Lovelace card for monitoring codes
+type: vertical-stack
+cards:
+  - type: entities
+    title: Lock Control Status
+    entities:
+      - entity: input_text.lockcontrol_daily_code
+        name: Daily Code
+      - entity: input_datetime.lockcontrol_daily_code_expiry
+        name: Daily Code Expiry
+      - entity: input_text.lockcontrol_one_time_code
+        name: One-Time Code
+      - entity: input_datetime.lockcontrol_one_time_code_expiry
+        name: One-Time Code Expiry
+      - entity: input_text.version
+        name: Version 

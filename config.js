@@ -3,7 +3,7 @@ const config = {
     HA_TOKEN: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiMTFjOTAxMzk0ZWI0ZTk4YTdhY2ZiMDNmN2NhNzQyNiIsImlhdCI6MTc0NjY0OTIyNSwiZXhwIjoyMDYyMDA5MjI1fQ.s3ccw_z17XxiJRMEO-29txiVKktbYgFNPL-X-pvl_JI',
     HA_URL: 'https://ha.silverserver.nl',
     DOCKER_PATH: '/var/lib/docker/volumes/hass_config/_data/www/admin-dashboard',
-    VERSION: '2.0.0',
+    VERSION: '2.1.0',
     timezone: 'Europe/Amsterdam',
     codeLength: 6,
     maxAttempts: 3,

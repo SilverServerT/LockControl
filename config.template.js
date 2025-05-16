@@ -3,7 +3,7 @@ const config = {
     HA_TOKEN: 'your-token-here',
     HA_URL: 'http://192.168.1.100:8123',  // Update this with your Home Assistant URL
     DOCKER_PATH: '/var/lib/docker/volumes/hass_config/_data/www/admin-dashboard',
-    VERSION: '2.0.0',
+    VERSION: '2.1.0',
     timezone: 'Europe/Amsterdam',
     codeLength: 6,
     maxAttempts: 3,

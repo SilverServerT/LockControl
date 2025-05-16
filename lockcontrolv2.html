@@ -31,6 +31,7 @@
             -webkit-touch-callout: none;
             -webkit-user-select: none;
             user-select: none;
+            overscroll-behavior: none;
         }
 
         .container {
@@ -74,14 +75,25 @@
             border-radius: 4px;
         }
 
+        .grid {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 100%;
+        }
+
         .card {
             background: var(--card-bg);
             border-radius: var(--radius);
-            padding: 20px;
+            padding: 15px;
             box-shadow: var(--shadow);
             width: 100%;
+            max-width: 320px;
             margin-bottom: 15px;
             transition: transform var(--transition);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
         }
 
         .card:hover {
@@ -90,8 +102,8 @@
 
         .card h2 {
             color: var(--primary);
-            margin-top: 0;
-            font-size: 1.2em;
+            margin: 0 0 10px 0;
+            font-size: 1.1em;
             font-weight: 500;
             display: flex;
             align-items: center;
@@ -103,22 +115,24 @@
         }
 
         .code-display {
-            font-size: 2em;
+            font-size: 1.8em;
             font-weight: 500;
             text-align: center;
-            padding: 20px;
+            padding: 15px;
             background: rgba(0,0,0,0.03);
             border-radius: var(--radius);
-            margin: 10px 0;
+            margin: 5px 0;
             font-family: monospace;
             letter-spacing: 2px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .expiry {
             text-align: center;
             color: #666;
-            font-size: 0.9em;
-            margin-top: 10px;
+            font-size: 0.85em;
+            margin: 5px 0;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -130,13 +144,11 @@
         }
 
         .button {
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 100%;
-            margin: 10px 0;
-            padding: 15px 0;
-            font-size: 1.1em;
+            padding: 12px 24px;
+            font-size: 1em;
             border: none;
             border-radius: 10px;
             background: var(--primary);
@@ -146,6 +158,9 @@
             font-weight: 500;
             box-shadow: 0 2px 8px rgba(25, 118, 210, 0.08);
             gap: 8px;
+            width: auto;
+            min-width: 120px;
+            margin: 10px auto;
         }
 
         .button .material-icons {
@@ -174,14 +189,16 @@
 
         .status {
             text-align: center;
-            padding: 12px;
+            padding: 8px;
             border-radius: var(--radius);
-            margin: 10px 0;
+            margin: 5px 0;
             font-weight: 500;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 8px;
+            width: 100%;
+            box-sizing: border-box;
         }
 
         .status .material-icons {
@@ -215,18 +232,30 @@
             padding: 15px;
             text-align: center;
             font-size: 1.5em;
-            border: 1px solid rgba(0,0,0,0.1);
+            border: 2px solid #d32f2f;
             border-radius: var(--radius);
             margin-bottom: 15px;
             min-height: 30px;
             font-family: monospace;
             letter-spacing: 2px;
+            transition: border-color 0.3s ease;
+        }
+
+        .keypad-display.success {
+            border-color: var(--accent);
+        }
+
+        .keypad-display.error {
+            border-color: var(--danger);
         }
 
         .keypad-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
+            width: 100%;
+            max-width: 300px;
+            margin: 0 auto;
         }
 
         .keypad-grid button {
@@ -238,6 +267,11 @@
             cursor: pointer;
             transition: all var(--transition);
             font-weight: 500;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            touch-action: manipulation;
         }
 
         .keypad-grid button:active {
@@ -276,7 +310,9 @@
                 max-width: 100%;
                 margin: 0;
                 padding: 15px;
-                min-height: calc(100vh - 30px);
+                min-height: 100vh;
+                height: 100vh;
+                overflow: hidden;
                 border-width: 6px;
             }
 
@@ -286,22 +322,144 @@
 
             .card {
                 padding: 15px;
+                max-width: 100%;
             }
 
             .code-display {
-                font-size: 1.8em;
-                padding: 15px;
+                font-size: 1.6em;
+                padding: 12px;
             }
 
             .button {
-                padding: 12px 0;
-                font-size: 1em;
+                padding: 12px 20px;
+                font-size: 0.95em;
+                width: 100%;
+                max-width: 300px;
+            }
+
+            .keypad-grid {
+                gap: 8px;
             }
 
             .keypad-grid button {
                 padding: 12px;
                 font-size: 1.1em;
             }
+
+            .keypad-display {
+                font-size: 1.3em;
+                padding: 12px;
+            }
+        }
+
+        @media (min-width: 601px) {
+            .container {
+                margin: 20px auto;
+                min-height: calc(100vh - 40px);
+            }
+
+            .keypad-grid {
+                max-width: 320px;
+            }
+
+            .keypad-grid button {
+                padding: 20px;
+                font-size: 1.4em;
+            }
+        }
+
+        /* Add touch feedback styles */
+        @media (hover: none) {
+            .button:active,
+            .keypad-grid button:active {
+                transform: scale(0.95);
+                background: rgba(0,0,0,0.05);
+            }
+        }
+
+        /* Add hover effects for devices with hover capability */
+        @media (hover: hover) {
+            .button:hover {
+                transform: translateY(-1px);
+                box-shadow: 0 4px 12px rgba(25, 118, 210, 0.12);
+            }
+
+            .keypad-grid button:hover {
+                background: rgba(0,0,0,0.02);
+            }
+        }
+
+        /* Prevent double-tap zoom on mobile */
+        * {
+            touch-action: manipulation;
+        }
+
+        /* Add safe area insets for modern mobile devices */
+        @supports (padding: max(0px)) {
+            .container {
+                padding-left: max(20px, env(safe-area-inset-left));
+                padding-right: max(20px, env(safe-area-inset-right));
+                padding-bottom: max(10px, env(safe-area-inset-bottom));
+            }
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+        }
+
+        .modal-content {
+            position: relative;
+            background: var(--card-bg);
+            margin: 15% auto;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .close {
+            position: absolute;
+            right: 20px;
+            top: 15px;
+            font-size: 24px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .input-group {
+            margin: 20px 0;
+        }
+
+        .input-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #666;
+        }
+
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: var(--radius);
+            font-size: 1em;
+        }
+
+        .lock-button {
+            margin-top: 10px;
+            background: var(--danger);
+        }
+
+        .lock-button.locked {
+            background: var(--accent);
         }
     </style>
 </head>
@@ -309,7 +467,7 @@
     <div class="container">
         <div class="header">
             <h1>Advanced Access Control</h1>
-            <div class="version">v2.0.0</div>
+            <div class="version">v2.1.0</div>
         </div>
 
         <div class="grid">
@@ -337,6 +495,32 @@
                 <div id="attemptsRemaining" class="attempts"></div>
                 <button id="checkAccess" class="button secondary">Check Access</button>
             </div>
+
+            <!-- Keypad Simulation Card -->
+            <div class="card">
+                <h2>Keypad Control</h2>
+                <div class="keypad">
+                    <div id="keypadDisplay" class="keypad-display">Enter Code</div>
+                    <div class="keypad-grid">
+                        <button onclick="simulateKeyPress('1')">1</button>
+                        <button onclick="simulateKeyPress('2')">2</button>
+                        <button onclick="simulateKeyPress('3')">3</button>
+                        <button onclick="simulateKeyPress('4')">4</button>
+                        <button onclick="simulateKeyPress('5')">5</button>
+                        <button onclick="simulateKeyPress('6')">6</button>
+                        <button onclick="simulateKeyPress('7')">7</button>
+                        <button onclick="simulateKeyPress('8')">8</button>
+                        <button onclick="simulateKeyPress('9')">9</button>
+                        <button onclick="simulateKeyPress('C')">C</button>
+                        <button onclick="simulateKeyPress('0')">0</button>
+                        <button onclick="simulateKeyPress('E')">E</button>
+                    </div>
+                    <button id="lockButton" class="button lock-button" onclick="toggleLock()">
+                        <span class="material-icons">lock</span>
+                        Lock Door
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -349,30 +533,43 @@
                 <label for="codeExpiry">Expiry Time (minutes):</label>
                 <input type="number" id="codeExpiry" value="60" min="1" max="1440">
             </div>
-            <button id="confirmGenerate" class="button success">Generate</button>
+            <button id="confirmGenerate" class="button">Generate</button>
         </div>
     </div>
 
+    <!-- Add version info -->
+    <div id="versionInfo" class="version-info" style="text-align: center; margin-top: 10px; font-size: 0.8em; color: #888; opacity: 0.5;">
+      <span class="material-icons" style="font-size: 0.9em; vertical-align: middle;">info</span>
+      <span id="versionNumber">v2.1.0</span>
+      <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800; display: none;">(YAML update required)</span>
+    </div>
+
+    <!-- Load configuration first -->
+    <script src="version_tracking.js"></script>
     <script>
-        // Configuration
+        // Configuration object
         const config = {
+            HA_TOKEN: '',
+            HA_URL: window.location.origin.replace('http://', 'https://'),
+            VERSION: '2.2.0',
+            timezone: 'Europe/Amsterdam',
             codeLength: 6,
             maxAttempts: 3,
             lockoutDuration: 300,
             codeExpiry: 86400,
-            timezone: "Europe/Amsterdam",
-            tasmotaSwitch: "tasmota.switch",
+            tasmotaSwitch: 'switch.tasmota',
             simulationMode: true,
-            HA_URL: window.location.origin.replace('http://', 'https://'),
-            HA_TOKEN: "",
             stateEntities: {
                 dailyCode: "input_text.lockcontrol_daily_code",
                 dailyCodeExpiry: "input_datetime.lockcontrol_daily_code_expiry",
                 oneTimeCode: "input_text.lockcontrol_one_time_code",
-                oneTimeCodeExpiry: "input_datetime.lockcontrol_one_time_code_expiry"
-            },
-            VERSION: '2.0.0'
+                oneTimeCodeExpiry: "input_datetime.lockcontrol_one_time_code_expiry",
+                version: "input_text.version_lockcontrolv2"
+            }
         };
+
+        // Initialize version tracker
+        let versionTracker;
 
         // State
         let currentDailyCode = null;
@@ -423,47 +620,23 @@
             });
         }
 
-        // Add keypad simulation
-        function addKeypadSimulation() {
-            const keypadHTML = `
-                <div class="card">
-                    <h2>Keypad Simulation</h2>
-                    <div class="keypad">
-                        <div class="keypad-display">${enteredCode || 'Enter Code'}</div>
-                        <div class="keypad-grid">
-                            <button onclick="simulateKeyPress('1')">1</button>
-                            <button onclick="simulateKeyPress('2')">2</button>
-                            <button onclick="simulateKeyPress('3')">3</button>
-                            <button onclick="simulateKeyPress('4')">4</button>
-                            <button onclick="simulateKeyPress('5')">5</button>
-                            <button onclick="simulateKeyPress('6')">6</button>
-                            <button onclick="simulateKeyPress('7')">7</button>
-                            <button onclick="simulateKeyPress('8')">8</button>
-                            <button onclick="simulateKeyPress('9')">9</button>
-                            <button onclick="simulateKeyPress('C')">C</button>
-                            <button onclick="simulateKeyPress('0')">0</button>
-                            <button onclick="simulateKeyPress('E')">E</button>
-                        </div>
-                    </div>
-                </div>
-            `;
-            document.querySelector('.grid').insertAdjacentHTML('beforeend', keypadHTML);
-        }
-
         // Simulate keypad press
         function simulateKeyPress(key) {
+            const keypadDisplay = document.querySelector('.keypad-display');
+            
             if (key === 'C') {
                 enteredCode = '';
+                keypadDisplay.textContent = 'Enter Code';
+                keypadDisplay.className = 'keypad-display';
             } else if (key === 'E') {
                 validateCode(enteredCode);
-                enteredCode = '';
             } else {
                 enteredCode += key;
                 if (enteredCode.length > 8) {
                     enteredCode = enteredCode.slice(0, 8);
                 }
+                keypadDisplay.textContent = enteredCode;
             }
-            document.querySelector('.keypad-display').textContent = enteredCode || 'Enter Code';
         }
 
         // Error handling and user feedback
@@ -482,6 +655,52 @@
             document.body.appendChild(successDiv);
             setTimeout(() => successDiv.remove(), duration);
         }
+
+        // Add loading indicator
+        function showLoading(show) {
+            let loadingDiv = document.getElementById('loadingIndicator');
+            if (!loadingDiv) {
+                loadingDiv = document.createElement('div');
+                loadingDiv.id = 'loadingIndicator';
+                loadingDiv.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    padding: 20px 40px;
+                    border-radius: 10px;
+                    z-index: 1000;
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                `;
+                loadingDiv.innerHTML = `
+                    <div class="spinner" style="
+                        width: 20px;
+                        height: 20px;
+                        border: 3px solid #f3f3f3;
+                        border-top: 3px solid var(--primary);
+                        border-radius: 50%;
+                        animation: spin 1s linear infinite;
+                    "></div>
+                    Loading...
+                `;
+                document.body.appendChild(loadingDiv);
+            }
+            loadingDiv.style.display = show ? 'flex' : 'none';
+        }
+
+        // Add spinner animation
+        const style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
 
         // Add a function to show token validation status
         function showTokenStatus(isValid, message) {
@@ -684,11 +903,15 @@
                 });
                 
                 if (!response.ok) {
-                    const errorData = await response.json();
+                    if (response.status === 401) {
+                        throw new Error('Authentication failed. Please check your token.');
+                    }
+                    const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
                     throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
                 }
                 
-                return await response.json();
+                const result = await response.json().catch(() => ({}));
+                return result;
             } catch (error) {
                 console.error('Error calling HA service:', error);
                 showError(`Failed to call ${domain}.${service}: ${error.message}`);
@@ -705,7 +928,10 @@
                 });
                 
                 if (!response.ok) {
-                    const errorData = await response.json();
+                    if (response.status === 401) {
+                        throw new Error('Authentication failed. Please check your token.');
+                    }
+                    const errorData = await response.json().catch(() => ({ message: `HTTP error! status: ${response.status}` }));
                     throw new Error(errorData.message || `HTTP error! status: ${response.status}`);
                 }
                 
@@ -726,7 +952,8 @@
                 });
                 return result;
             } catch (error) {
-                showError(`Failed to set state for ${entityId}`);
+                console.error('Error setting HA state:', error);
+                showError(`Failed to set state for ${entityId}: ${error.message}`);
                 throw error;
             }
         }
@@ -739,7 +966,8 @@
                 });
                 return result;
             } catch (error) {
-                showError(`Failed to set datetime for ${entityId}`);
+                console.error('Error setting HA datetime:', error);
+                showError(`Failed to set datetime for ${entityId}: ${error.message}`);
                 throw error;
             }
         }
@@ -751,10 +979,16 @@
                 const response = await fetch(`${config.HA_URL}/api/`, {
                     headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
                 });
+                
                 if (!response.ok) {
-                    showTokenStatus(false, 'Token validation failed');
+                    if (response.status === 401) {
+                        showTokenStatus(false, 'Invalid token');
+                        throw new Error('Authentication failed: Invalid token');
+                    }
+                    showTokenStatus(false, 'Authentication failed');
                     throw new Error(`Authentication failed: ${response.status}`);
                 }
+                
                 console.log('Authentication successful');
                 showTokenStatus(true, 'Token validated successfully');
                 return true;
@@ -768,6 +1002,7 @@
         // Load saved state from Home Assistant with error handling
         async function loadSavedState() {
             try {
+                showLoading(true);
                 await loadConfig();
                 const isAuthenticated = await verifyAuth();
                 if (!isAuthenticated) {
@@ -786,12 +1021,14 @@
                         currentDailyCode = savedDailyCode;
                         dailyCodeDisplay.textContent = currentDailyCode;
                         dailyCodeExpiry.textContent = `Expires at ${formatTime(expiry)}`;
-                        return;
+                        dailyCodeStatus.textContent = 'Code Active';
+                        dailyCodeStatus.className = 'status success';
+                    } else {
+                        await generateNewDailyCode();
                     }
+                } else {
+                    await generateNewDailyCode();
                 }
-                
-                // Generate new daily code if none exists or expired
-                await generateNewDailyCode();
                 
                 // Load one-time code if it exists and hasn't expired
                 if (savedOneTimeCode && savedOneTimeCodeExpiry) {
@@ -805,11 +1042,27 @@
                         oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiry)}`;
                         oneTimeCodeStatus.textContent = 'Code Active';
                         oneTimeCodeStatus.className = 'status success';
+                    } else {
+                        // Clear expired one-time code
+                        await setHAState(config.stateEntities.oneTimeCode, '');
+                        await setHADatetime(config.stateEntities.oneTimeCodeExpiry, '');
+                        oneTimeCodeDisplay.textContent = 'Generate Code';
+                        oneTimeCodeExpiry.textContent = '';
+                        oneTimeCodeStatus.textContent = 'No Active Code';
+                        oneTimeCodeStatus.className = 'status';
                     }
+                } else {
+                    oneTimeCodeDisplay.textContent = 'Generate Code';
+                    oneTimeCodeExpiry.textContent = '';
+                    oneTimeCodeStatus.textContent = 'No Active Code';
+                    oneTimeCodeStatus.className = 'status';
                 }
+
+                showLoading(false);
             } catch (error) {
                 console.error('Error loading saved state:', error);
                 showError('Failed to load saved state. Please refresh the page.');
+                showLoading(false);
             }
         }
 
@@ -865,32 +1118,44 @@
 
         // Generate One-Time Code
         async function generateOneTimeCode(expiryMinutes) {
-            let code = '';
-            for (let i = 0; i < 8; i++) {
-                code += Math.floor(Math.random() * 10).toString();
+            try {
+                showLoading(true);
+                let code = '';
+                for (let i = 0; i < 8; i++) {
+                    code += Math.floor(Math.random() * 10).toString();
+                }
+                
+                const expiryTime = new Date(Date.now() + expiryMinutes * 60000);
+                currentOneTimeCode = {
+                    code: code,
+                    expiry: expiryTime
+                };
+                
+                // Save to Home Assistant
+                await setHAState(config.stateEntities.oneTimeCode, code);
+                await setHADatetime(config.stateEntities.oneTimeCodeExpiry, expiryTime.toISOString());
+                
+                // Update UI immediately
+                oneTimeCodeDisplay.textContent = code;
+                oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiryTime)}`;
+                oneTimeCodeStatus.textContent = 'Code Generated';
+                oneTimeCodeStatus.className = 'status success';
+                
+                showSuccess('New code generated successfully');
+                showLoading(false);
+            } catch (error) {
+                console.error('Error generating one-time code:', error);
+                showError('Failed to generate code');
+                oneTimeCodeStatus.textContent = 'Generation Failed';
+                oneTimeCodeStatus.className = 'status error';
+                showLoading(false);
             }
-            
-            const expiryTime = new Date(Date.now() + expiryMinutes * 60000);
-            currentOneTimeCode = {
-                code: code,
-                expiry: expiryTime
-            };
-            
-            // Save to Home Assistant
-            await setHAState(config.stateEntities.oneTimeCode, code);
-            await setHADatetime(config.stateEntities.oneTimeCodeExpiry, expiryTime.toISOString());
-            
-            oneTimeCodeDisplay.textContent = code;
-            oneTimeCodeExpiry.textContent = `Expires at ${formatDateTime(expiryTime)}`;
-            oneTimeCodeStatus.textContent = 'Code Generated';
-            oneTimeCodeStatus.className = 'status success';
         }
 
         // Validate entered code with error handling
         async function validateCode(code) {
             if (isLockedOut) {
-                accessStatus.textContent = 'System Locked Out';
-                accessStatus.className = 'status error';
+                showError('System is locked out');
                 return;
             }
 
@@ -898,10 +1163,10 @@
                 let isValid = false;
                 if (code === currentDailyCode) {
                     isValid = true;
-                    accessStatus.textContent = 'Access Granted - Daily Code';
+                    showSuccess('Access granted - Daily Code');
                 } else if (currentOneTimeCode && code === currentOneTimeCode.code) {
                     isValid = true;
-                    accessStatus.textContent = 'Access Granted - One-Time Code';
+                    showSuccess('Access granted - One-Time Code');
                     // Clear one-time code after use
                     currentOneTimeCode = null;
                     await setHAState(config.stateEntities.oneTimeCode, '');
@@ -909,49 +1174,54 @@
                     oneTimeCodeDisplay.textContent = 'Generate Code';
                     oneTimeCodeExpiry.textContent = '';
                     oneTimeCodeStatus.textContent = 'Code Used';
+                    oneTimeCodeStatus.className = 'status';
                 }
 
+                const keypadDisplay = document.querySelector('.keypad-display');
+                
                 if (isValid) {
-                    accessStatus.className = 'status success';
-                    attemptsRemaining = config.maxAttempts;
+                    keypadDisplay.className = 'keypad-display success';
                     try {
                         // Activate Tasmota switch
                         await callHAService('switch', 'turn_on', {
                             entity_id: config.tasmotaSwitch
                         });
-                        showSuccess('Access granted! Door unlocked.');
                         
-                        // Turn off after 5 seconds
+                        // Turn off after 10 seconds
                         setTimeout(async () => {
                             try {
                                 await callHAService('switch', 'turn_off', {
                                     entity_id: config.tasmotaSwitch
                                 });
+                                keypadDisplay.className = 'keypad-display';
+                                keypadDisplay.textContent = 'Enter Code';
                             } catch (error) {
-                                showError('Failed to lock door automatically. Please check manually.');
+                                showError('Failed to lock door automatically');
                             }
-                        }, 5000);
+                        }, 10000);
                     } catch (error) {
-                        showError('Failed to unlock door. Please try again.');
+                        showError('Failed to unlock door');
                     }
                 } else {
+                    keypadDisplay.className = 'keypad-display error';
                     attemptsRemaining--;
                     if (attemptsRemaining <= 0) {
                         isLockedOut = true;
                         lockoutEndTime = Date.now() + (config.lockoutDuration * 1000);
-                        accessStatus.textContent = 'Access Denied - System Locked';
-                        accessStatus.className = 'status error';
                         showError(`System locked for ${config.lockoutDuration} seconds`);
                     } else {
-                        accessStatus.textContent = 'Access Denied';
-                        accessStatus.className = 'status warning';
                         showError(`Invalid code. ${attemptsRemaining} attempts remaining`);
                     }
+                    setTimeout(() => {
+                        keypadDisplay.className = 'keypad-display';
+                        keypadDisplay.textContent = 'Enter Code';
+                    }, 2000);
                 }
+                enteredCode = '';
                 updateAttemptsDisplay();
             } catch (error) {
                 console.error('Error validating code:', error);
-                showError('System error. Please try again.');
+                showError('System error');
             }
         }
 
@@ -989,8 +1259,8 @@
 
         confirmGenerate.addEventListener('click', async () => {
             const expiryMinutes = parseInt(codeExpiryInput.value) || 60;
-            await generateOneTimeCode(expiryMinutes);
             generateModal.style.display = 'none';
+            await generateOneTimeCode(expiryMinutes);
         });
 
         checkAccessButton.addEventListener('click', () => {
@@ -1024,6 +1294,7 @@
         // Initialize with error handling
         async function init() {
             try {
+                showLoading(true);
                 await loadConfig();
                 const isAuthenticated = await verifyAuth();
                 if (!isAuthenticated) {
@@ -1032,19 +1303,17 @@
                 
                 await loadSavedState();
                 updateAttemptsDisplay();
-                setInterval(() => updateDailyCode(), 60000); // Check daily code expiry every minute
-                setInterval(checkLockout, 1000); // Check lockout every second
-                if (config.simulationMode) {
-                    addKeypadSimulation();
-                }
+                setInterval(() => updateDailyCode(), 60000);
+                setInterval(checkLockout, 1000);
                 
-                // Check YAML version
                 checkYamlVersion();
                 
                 showSuccess('System initialized successfully');
+                showLoading(false);
             } catch (error) {
                 console.error('Error initializing system:', error);
                 showError('Failed to initialize system. Please refresh the page.');
+                showLoading(false);
             }
         }
 
@@ -1052,46 +1321,51 @@
         init();
 
         // Update version number on load
-        document.getElementById('versionNumber').textContent = `v${config.VERSION}`;
-
-        // Add version info to the UI
-        const versionInfo = document.createElement('div');
-        versionInfo.className = 'version-info';
-        versionInfo.style.cssText = 'text-align: center; margin-top: 10px; font-size: 0.8em; color: #888; opacity: 0.5;';
-        versionInfo.innerHTML = `
-            <span class="material-icons" style="font-size: 0.9em; vertical-align: middle;">info</span>
-            <span id="versionNumber">v${config.VERSION}</span>
-            <span id="versionStatus" style="font-size: 0.9em; margin-left: 5px; color: #ff9800;">(YAML update required)</span>
-        `;
-        document.body.appendChild(versionInfo);
+        const versionNumber = document.getElementById('versionNumber');
+        if (versionNumber) {
+            versionNumber.textContent = `v${config.VERSION}`;
+        }
 
         // Check if YAML has been updated
         async function checkYamlVersion() {
             try {
-                const response = await fetch(`${config.HA_URL}/api/states/input_text.version`, {
-                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
-                });
-                if (!response.ok) {
-                    // If the entity doesn't exist, show the warning
-                    document.getElementById('versionStatus').style.display = 'inline';
-                    document.querySelector('.version-info').style.opacity = '0.5';
+                const versionStatus = document.getElementById('versionStatus');
+                const versionInfo = document.getElementById('versionInfo');
+                
+                if (!versionStatus || !versionInfo) {
+                    console.warn('Version check elements not found');
                     return;
                 }
+
+                const response = await fetch(`${config.HA_URL}/api/states/${config.stateEntities.version}`, {
+                    headers: { 'Authorization': `Bearer ${config.HA_TOKEN}` }
+                });
+                
+                if (!response.ok) {
+                    versionStatus.style.display = 'inline';
+                    versionStatus.textContent = '(YAML update required)';
+                    versionInfo.style.opacity = '0.5';
+                    return;
+                }
+                
                 const data = await response.json();
                 if (data.state === config.VERSION) {
-                    // If versions match, hide the warning
-                    document.getElementById('versionStatus').style.display = 'none';
-                    document.querySelector('.version-info').style.opacity = '1';
+                    versionStatus.style.display = 'none';
+                    versionInfo.style.opacity = '1';
                 } else {
-                    // If versions don't match, show the warning
-                    document.getElementById('versionStatus').style.display = 'inline';
-                    document.querySelector('.version-info').style.opacity = '0.5';
+                    versionStatus.style.display = 'inline';
+                    versionStatus.textContent = `(YAML version: ${data.state})`;
+                    versionInfo.style.opacity = '0.5';
                 }
             } catch (error) {
                 console.error('Error checking YAML version:', error);
-                // On error, show the warning
-                document.getElementById('versionStatus').style.display = 'inline';
-                document.querySelector('.version-info').style.opacity = '0.5';
+                const versionStatus = document.getElementById('versionStatus');
+                const versionInfo = document.getElementById('versionInfo');
+                if (versionStatus && versionInfo) {
+                    versionStatus.style.display = 'inline';
+                    versionStatus.textContent = '(Version check failed)';
+                    versionInfo.style.opacity = '0.5';
+                }
             }
         }
 
@@ -1135,18 +1409,137 @@
                 });
         }
 
-        function toggleLock() {
-            if (currentState === 'on') {
-                callService('switch.turn_off', { entity_id: config.tasmotaSwitch });
-            } else if (currentState === 'off') {
-                // When manually locking, clear any active timer
-                if (timerInterval) {
-                    clearInterval(timerInterval);
-                    timerInterval = null;
+        // Toggle lock state
+        async function toggleLock() {
+            const lockButton = document.getElementById('lockButton');
+            try {
+                if (currentState === 'on') {
+                    await callHAService('switch', 'turn_off', {
+                        entity_id: config.tasmotaSwitch
+                    });
+                    lockButton.innerHTML = '<span class="material-icons">lock</span> Lock Door';
+                    lockButton.className = 'button lock-button';
+                    showSuccess('Door locked');
+                } else {
+                    await callHAService('switch', 'turn_on', {
+                        entity_id: config.tasmotaSwitch
+                    });
+                    lockButton.innerHTML = '<span class="material-icons">lock_open</span> Unlock Door';
+                    lockButton.className = 'button lock-button locked';
+                    showSuccess('Door unlocked');
                 }
-                clearTimerState().then(() => {
-                    callService('switch.turn_on', { entity_id: config.tasmotaSwitch });
-                });
+            } catch (error) {
+                showError('Failed to toggle lock');
+            }
+        }
+
+        // Add device-specific initialization
+        function initDeviceSpecific() {
+            // Add viewport meta tag for proper mobile scaling
+            const meta = document.createElement('meta');
+            meta.name = 'viewport';
+            meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+            document.head.appendChild(meta);
+
+            // Add safe area insets for modern mobile devices
+            if (CSS.supports('padding: max(0px)')) {
+                document.documentElement.style.setProperty('--safe-area-inset-top', 'env(safe-area-inset-top)');
+                document.documentElement.style.setProperty('--safe-area-inset-bottom', 'env(safe-area-inset-bottom)');
+            }
+
+            // Prevent pull-to-refresh
+            document.body.style.overscrollBehavior = 'none';
+
+            // Add touch event handling
+            document.addEventListener('touchstart', function(e) {
+                if (e.touches.length > 1) {
+                    e.preventDefault();
+                }
+            }, { passive: false });
+
+            // Add double-tap prevention
+            let lastTap = 0;
+            document.addEventListener('touchend', function(e) {
+                const currentTime = new Date().getTime();
+                const tapLength = currentTime - lastTap;
+                if (tapLength < 500 && tapLength > 0) {
+                    e.preventDefault();
+                }
+                lastTap = currentTime;
+            });
+        }
+
+        // Update init function to include device-specific initialization
+        async function init() {
+            try {
+                showLoading(true);
+                initDeviceSpecific();
+                await loadConfig();
+                const isAuthenticated = await verifyAuth();
+                if (!isAuthenticated) {
+                    throw new Error('Authentication failed');
+                }
+                
+                await loadSavedState();
+                updateAttemptsDisplay();
+                setInterval(() => updateDailyCode(), 60000);
+                setInterval(checkLockout, 1000);
+                
+                checkYamlVersion();
+                
+                showSuccess('System initialized successfully');
+                showLoading(false);
+            } catch (error) {
+                console.error('Error initializing system:', error);
+                showError('Failed to initialize system. Please refresh the page.');
+                showLoading(false);
+            }
+        }
+
+        // Initialize the application
+        async function initializeApp() {
+            try {
+                await loadConfig();
+                const isAuthenticated = await verifyAuth();
+                if (!isAuthenticated) {
+                    throw new Error('Authentication failed');
+                }
+                
+                // Initialize version tracker if available
+                if (typeof VersionTracker !== 'undefined') {
+                    try {
+                        versionTracker = new VersionTracker(config);
+                        await versionTracker.checkVersion();
+                    } catch (versionError) {
+                        console.warn('Version tracking not available:', versionError);
+                    }
+                } else {
+                    console.warn('Version tracking not available - version_tracking.js may not be loaded');
+                }
+                
+                // Initialize the rest of your application
+                const state = await getLockState(false);
+                
+                // Set up polling interval
+                setInterval(() => {
+                    getLockState(true).catch(error => {
+                        console.error('Background poll error:', error);
+                    });
+                }, 60000);
+
+                updateSunsetTime();
+                setInterval(updateSunsetTime, 3600000);
+                
+                // Initialize timer if unlocked
+                if (state === 'off') {
+                    initializeTimer();
+                }
+                
+                updateInfoBar();
+                setInterval(updateInfoBar, 60000);
+            } catch (error) {
+                console.error('Error initializing app:', error);
+                showError('Failed to initialize application. Please check your configuration and token.');
             }
         }
     </script>
